@@ -6,6 +6,27 @@ const L=require('./lib');
   await p.addInitScript(()=>{try{localStorage.removeItem('inkElements.v1');}catch(e){}});
   await p.goto(url,{waitUntil:'commit'});await L.ready(p);
   await p.evaluate(()=>window.__jc.instant(true));
+  // new-enemy reveal fires once per type (fresh save), and pauses the sim
+  console.log('== reveals + ultimates');
+  await p.evaluate(()=>{window.__jc.startMap(0);window.__jc.skipToWave(1);});
+  const rv=await p.evaluate(()=>window.__jc.untilCut('enemy',20));
+  L.check(rv==='grunt','enemy reveal for the first grunt ('+rv+')',fails);
+  const t0=await p.evaluate(()=>window.__jc.G.time);await L.frames(p,6);const t1=await p.evaluate(()=>window.__jc.G.time);
+  L.check(t1===t0,'sim paused during the reveal',fails);await L.shot(p,'run_reveal_grunt');
+  await L.skipCut(p);L.check(!(await p.evaluate(()=>window.__jc.state.cut)),'reveal skippable',fails);
+  await p.evaluate(()=>{window.__jc.step(15);window.__jc.skipToWave(2);window.__jc.step(15);});
+  const rs=await p.evaluate(()=>window.__jc.state.reveals.filter(r=>r==='enemy:grunt').length);
+  L.check(rs===1,'grunt reveal fired exactly once ('+rs+')',fails);
+  L.check((await p.evaluate(()=>window.__jc.state.seenEnemies)).includes('grunt'),'seenEnemies saved',fails);
+  for(const u of ['meteor','tsunami','tornado']){
+    await p.evaluate(u=>{window.__jc.clearCuts();const t=window.__jc.freeTiles(1)[0];window.__jc.ult(u,t.tx,t.ty);},u);
+    L.check((await p.evaluate(()=>window.__jc.state.cutin))===u,u+' cut-in fires',fails);
+    await L.frames(p,3);await L.shot(p,'run_ult_'+u);
+    await p.keyboard.press('Enter');for(let k=0;k<10&&(await p.evaluate(()=>window.__jc.state.cutin));k++)await L.frames(p,2);
+    L.check(!(await p.evaluate(()=>window.__jc.state.cutin)),u+' cut-in skipped with Enter',fails);
+    L.check(await p.evaluate(()=>window.__jc.G.specials.length>0),u+' effect running',fails);
+    for(let k=0;k<6;k++)await L.frames(p,2);await L.shot(p,'run_fx_'+u);await p.evaluate(()=>{window.__jc.G.specials=[];});
+  }
   for(const mi of [0,1,2]){
     console.log('== map '+mi);
     await p.evaluate(mi=>{window.__jc.startMap(mi);window.__jc.gold(5000);

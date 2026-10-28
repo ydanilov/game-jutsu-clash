@@ -20,4 +20,7 @@ async function clickId(page,id,o={}){await page.waitForFunction(i=>!!window.__jc
 async function frames(page,n){await page.evaluate(n=>new Promise(r=>{let k=0;const f=()=>{if(++k>=n)r();else requestAnimationFrame(f);};requestAnimationFrame(f);}),n||3);}
 async function settle(page){await page.waitForFunction(()=>!window.__jc.state.curtain,null,{timeout:90000});await frames(page,4);}
 function check(cond,msg,fails){if(!cond){fails.push(msg);console.log('  FAIL',msg);}else console.log('  ok',msg);}
-module.exports={serve,launch,watch,ready,shot,clickId,frames,settle,check,SHOTS};
+// skip whatever cut-in is showing (click/tap the middle) and wait until play resumes
+async function skipCut(page,touch){for(let i=0;i<8;i++){const st=await page.evaluate(()=>window.__jc.state);if(!st.cut&&!st.cutin)return;const c=await page.evaluate(()=>window.__jc.toClient(window.__jc.state.VW/2,window.__jc.state.VH/2));if(touch)await page.touchscreen.tap(c.x,c.y);else await page.mouse.click(c.x,c.y);for(let k=0;k<12;k++){await frames(page,2);const s2=await page.evaluate(()=>window.__jc.state);if(!s2.cut&&!s2.cutin)return;}}}
+async function waitCut(page,kind){await page.waitForFunction(k=>window.__jc.state.cut===k||window.__jc.state.cutin===k,kind,{timeout:90000});await frames(page,6);}
+module.exports={skipCut,waitCut,serve,launch,watch,ready,shot,clickId,frames,settle,check,SHOTS};

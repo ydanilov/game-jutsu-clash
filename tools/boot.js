@@ -1,4 +1,4 @@
-// Boot: no console errors, intro (title art) renders, all 7 images requested and loaded, then the 3D lobby.
+// Boot: no console errors, intro (title art) renders, every image requested and loaded, then the 3D lobby.
 const L=require('./lib');
 (async()=>{
   const {s,url}=await L.serve();const b=await L.launch();const fails=[],errs=[];
@@ -9,8 +9,9 @@ const L=require('./lib');
   await p.goto(url,{waitUntil:'commit'});await L.ready(p);
   const st=await p.evaluate(()=>window.__jc.state);
   L.check(st.screen==='intro','starts on the intro (key art) screen',fails);
-  L.check(req.size===7,'7 images requested ('+[...req].join(',')+')',fails);
-  L.check(ok.size===7,'7 images served 200',fails);
+  const nArt=Object.keys(st.art).length;
+  L.check(nArt>=35&&req.size===nArt,req.size+'/'+nArt+' images requested',fails);
+  L.check(ok.size===nArt,ok.size+' images served 200',fails);
   L.check(Object.values(st.art).every(v=>v==='ok'),'all images decoded: '+JSON.stringify(st.art),fails);
   // canvas actually has pixels from the art
   const px=await p.evaluate(()=>{const c=document.getElementById('game');const x=c.getContext('2d').getImageData(c.width/2,c.height*0.45,1,1).data;return Array.from(x);});

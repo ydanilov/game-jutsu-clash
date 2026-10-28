@@ -32,6 +32,7 @@ async function run(b,url,vp,tag,touch,fails){
     await tap('map'+mi,50);await L.settle(p);await p.waitForTimeout(1600);
     const s=await st();L.check(s.screen==='play'&&s.wave===0,'map '+mi+' starts',fails);
     await S('1'+mi+'_play_map'+mi);
+    {const g=await st();L.check(g.painted&&g.grid==='off'&&g.gridOp<0.01,'map '+mi+' painted, grid hidden by default',fails);}
     if(mi<2){await p.evaluate(()=>window.__jc.go('maps'));await p.waitForTimeout(400);}
   }
   // build each base tower by tapping tiles and the radial menu
@@ -41,7 +42,7 @@ async function run(b,url,vp,tag,touch,fails){
   for(let i=0;i<4;i++){
     const t=tiles[i];const cc=await p.evaluate(t=>window.__jc.tileClient(t.tx,t.ty),t);
     if(touch)await p.touchscreen.tap(cc.x,cc.y);else await p.mouse.click(cc.x,cc.y);await L.frames(p,3);await p.waitForTimeout(350);
-    if(i===0)await S('20_build_menu');
+    if(i===0){for(let k=0;k<6;k++)await L.frames(p,2);const g=await st();L.check(g.grid==='on'&&g.gridOp>0.05,'grid visible while choosing a build spot ('+g.gridOp.toFixed(2)+')',fails);await S('20_build_menu');}
     if(i===0&&!touch){const h=await p.evaluate(()=>window.__jc.center('b_air'));await p.mouse.move(h.x,h.y);await L.frames(p,10);await S('21_build_hover');}
     await tap('b_'+els[i],200);
   }
@@ -59,15 +60,16 @@ async function run(b,url,vp,tag,touch,fails){
   await tap('fus');L.check((await st()).fuseFrom,'fuse mode on',fails);await S('24_fuse_pick');
   const t1=s.towers[1];cc=await p.evaluate(t=>window.__jc.tileClient(t.tx,t.ty),t1);
   if(touch)await p.touchscreen.tap(cc.x,cc.y);else await p.mouse.click(cc.x,cc.y);await L.frames(p,3);await p.waitForTimeout(500);
-  s=await st();L.check(s.towers.length===3&&s.codex.length===1,'fusion made ('+s.codex.join(',')+')',fails);await S('25_fused');
+  s=await st();L.check(s.towers.length===3&&s.codex.length===1,'fusion made ('+s.codex.join(',')+')',fails);
+  await L.waitCut(p,'fusion');await S('25_fusion_reveal');L.check((await st()).reveals.filter(r=>r.startsWith('fusion')).length===1,'new-fusion reveal shown',fails);await L.skipCut(p,touch);await S('25_fused');
   // fuse by drag (desktop mouse only; touch drag uses the same pointer path)
   {const a=s.towers.find(t=>['earth','air'].includes(t.type)),bb=s.towers.find(t=>t!==a&&['earth','air'].includes(t.type));
    const ca=await p.evaluate(t=>window.__jc.tileClient(t.tx,t.ty),a),cb=await p.evaluate(t=>window.__jc.tileClient(t.tx,t.ty),bb);
    if(!touch){await p.mouse.move(ca.x,ca.y);await p.mouse.down();await p.mouse.move((ca.x+cb.x)/2,(ca.y+cb.y)/2,{steps:6});await p.mouse.move(cb.x,cb.y,{steps:6});await L.frames(p,6);await S('26_drag_fuse');await p.mouse.up();}
    else{const cdp=await c.newCDPSession(p);const tp=(type,x,y)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:type==='touchEnd'?[]:[{x,y}]});await tp('touchStart',ca.x,ca.y);for(let k=1;k<=10;k++)await tp('touchMove',ca.x+(cb.x-ca.x)*k/10,ca.y+(cb.y-ca.y)*k/10);await L.frames(p,6);await S('26_drag_fuse');await tp('touchEnd');}
-   await p.waitForTimeout(400);s=await st();L.check(s.towers.length===2&&s.codex.length===2,'drag fusion made ('+s.codex.join(',')+')',fails);}
+   await p.waitForTimeout(400);s=await st();L.check(s.towers.length===2&&s.codex.length===2,'drag fusion made ('+s.codex.join(',')+')',fails);await L.waitCut(p,'fusion');await L.skipCut(p,touch);}
   // ultimate + wave button states
-  await tap('next',300);await p.waitForTimeout(800);await S('27_wave1');
+  await tap('next',300);await L.waitCut(p,'enemy');await S('27_enemy_reveal');L.check((await st()).cutType==='grunt','new-enemy reveal for the grunt',fails);await L.skipCut(p,touch);await p.waitForTimeout(800);await S('27_wave1');
   // pause, settings, quit
   await tap('pause',300);L.check((await st()).paused,'pause opens',fails);await p.waitForTimeout(300);await S('30_pause');
   if(!touch){await p.keyboard.press('ArrowDown');await L.frames(p,6);await S('31_pause_focus');}
@@ -75,6 +77,7 @@ async function run(b,url,vp,tag,touch,fails){
   await tap('pset_back',200);await tap('quit');await L.settle(p);await p.waitForTimeout(400);
   L.check((await st()).screen==='maps','quit to map select',fails);
   await p.evaluate(()=>window.__jc.go('codex'));await p.waitForTimeout(500);await S('34_codex_found');
+  await tap('tab_best',200);L.check((await st()).codexTab==='best','bestiary tab opens',fails);await S('35_bestiary');
   // stage fits viewport
   const ov=await p.evaluate(()=>({sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,iw:innerWidth,ih:innerHeight}));
   L.check(ov.sw<=ov.iw&&ov.sh<=ov.ih,'no page overflow '+JSON.stringify(ov),fails);
