@@ -1,0 +1,13 @@
+{
+  "name": "jutsu-clash-tools",
+  "private": true,
+  "description": "Playwright checks for Jutsu Clash (src.html)",
+  "scripts": {
+    "build": "bash build-test.sh",
+    "test": "bash run-all.sh"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "three": "0.128.0"
+  }
+}
