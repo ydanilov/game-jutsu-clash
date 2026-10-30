@@ -56,6 +56,17 @@ const VPS=[{n:'phone_portrait',w:390,h:844,dpr:3},{n:'phone_landscape',w:844,h:3
     const az1=await p.evaluate(()=>TD.CAM.taz);
     L.check(Math.abs(az1-az0)>0.2,'drag turns the camera',fails);
     L.check((await p.evaluate(()=>window.__jc.state.towers.length))===1,'gestures did not build or open menus',fails);
+    if(v.n==='phone_landscape'){
+      await p.evaluate(()=>{window.__jc.clearCuts();const t=window.__jc.freeTiles(1)[0];window.__jc.ult('meteor',t.tx,t.ty);});
+      L.check((await p.evaluate(()=>window.__jc.state.vid))===null,'phones use the still ultimate cut-in by default',fails);await L.skipCut(p,true);
+      await p.evaluate(()=>{window.__jc.video(true);window.__jc.preloadVideos();});
+      await p.waitForFunction(()=>window.__jc.state.vidState.tornado!=='loading',null,{timeout:90000});
+      await p.evaluate(()=>{window.__jc.G.specials=[];const t=window.__jc.freeTiles(1)[0];window.__jc.ult('tornado',t.tx,t.ty);});
+      let st;for(let k=0;k<60;k++){st=await p.evaluate(()=>window.__jc.state);if(st.vid!=='wait'&&(st.vid!=='video'||st.vidT>1))break;await L.frames(p,1);}
+      L.check(st.vid==='video','forced video cut-in plays on a phone ('+st.vid+')',fails);await L.shot(p,'mobile_'+v.n+'_video');
+      await L.skipCut(p,true);L.check(!(await p.evaluate(()=>window.__jc.state.cutin)),'tap skips the video',fails);
+      await p.evaluate(()=>{window.__jc.video();window.__jc.G.specials=[];});
+    }
     await L.clickId(p,'pause',{touch:true,wait:400});await L.shot(p,'mobile_'+v.n+'_pause');
     L.check(errs.length===0,'no errors '+errs.join(' | '),fails);
     await c.close();

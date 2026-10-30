@@ -731,7 +731,7 @@ function startMap(mi){
   G={mi,map:m,P,grid,towers:[],enemies:[],projs:[],pools:[],fx:[],texts:[],bolts:[],specials:[],
     gold:220,hp:100,maxHp:100,wave:0,spawners:[],waveLeft:{},cleared:{},ult:{charge:0,idx:0},time:0,speed:1,
     sel:{tx:Math.floor(GW/2),ty:Math.floor(GH/2)},menu:null,fuseFrom:null,drag:null,targeting:false,cursor:{x:W/2,y:H/2},result:null,resultT:0,banner:null,hover:null,dealt:0};
-  screen='play';paused=false;cutin=null;clearCuts();focusId=null;MUS.mode='play';pauseView='main';
+  screen='play';paused=false;clearCuts();cutin=null;vidPreloadMatch();focusId=null;MUS.mode='play';pauseView='main';
   CAM.taz=0;CAM.az=0.6;CAM.tpol=0.9;CAM.pol=0.7;CAM.tr=24;CAM.r=40;CAM.ttx=0;CAM.ttz=0.6;
   rngS=7+mi*13;
 }
@@ -745,6 +745,7 @@ function callWave(){
   if(!canCallWave()){sfx('deny');return false;}
   const b=earlyBonus();if(b){G.gold+=b;addTextS(VW-170,140,'+'+b+' early',18,C.gold);}
   G.wave++;const list=makeWave(G.wave);G.waveLeft[G.wave]=list.length;G.spawners.push({wave:G.wave,list,i:0,t:0});
+  vidPreloadBoss(G.wave);vidPreloadBoss(G.wave+1);
   sfx('gong');banner(G.wave===20?'FINAL WAVE':'WAVE '+G.wave,G.wave%5===0?'A boss is coming':'');
   MUS.mode=G.wave%5===0?'boss':'play';
   return true;
@@ -824,7 +825,7 @@ function tryUlt(){
   if(u.target){G.targeting=true;G.menu=null;G.fuseFrom=null;if(padActive||!ptr.inside){G.cursor.x=tc(G.sel.tx);G.cursor.y=tc(G.sel.ty);}}
   else fireUlt(u,0,0);
 }
-function fireUlt(u,x,y){G.ult.charge=0;G.targeting=false;cutin={t:0,dur:RM?0.6:1.05,u,then:()=>doUlt(u,x,y)};sfx('cutin');}
+function fireUlt(u,x,y){G.ult.charge=0;G.targeting=false;cutin={t:0,dur:RM?0.6:1.05,u,then:()=>doUlt(u,x,y)};vidTry(cutin,u.id,true);sfx('cutin');}
 function doUlt(u,x,y){
   const w=G.wave||1,sc=MAPS[G.mi].hp;
   if(u.id==='meteor'){G.specials.push({k:'meteor',x,y,t:0,dur:0.6,dmg:(450+130*w)*sc});}
@@ -1563,6 +1564,86 @@ function drawBanner(){
   if(b.sub)txt(b.sub,VW/2,by+62,14,{align:'center',col:C.gold});
   ctx.restore();
 }
+/* ---------------- video cut-ins (Veo clips, 854x480 H.264, ~3.6 s) ----------------
+   Ultimates and the two bosses play a clip inside the cut-in. Loaded lazily once a match starts (ultimates) or just before
+   a boss wave. If a clip can't start within 0.4 s (error, autoplay blocked, slow network) the still-art cut-in runs instead.
+   Reduced motion, QLOW (phones, low-end) and data-saver always use the stills. */
+const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
+let vidForce=null; // tests: true = allow on any device, false = block
+function vidAllowed(){if(vidForce!==null)return vidForce;const c=navigator.connection;return !RM&&!QLOW&&!(c&&c.saveData);}
+function vidLoad(k){
+  if(!vidAllowed()||!VID_INFO[k])return null;if(VID[k])return VID[k];
+  const el=document.createElement('video'),v={k,el,state:'loading',seen:false,poster:new Image()};
+  el.muted=true;el.playsInline=true;el.setAttribute('playsinline','');el.preload='auto';el.poster='assets/video/jcv_'+k+'.webp';
+  v.poster.src='assets/video/jcv_'+k+'.webp';
+  el.addEventListener('canplaythrough',()=>{if(v.state==='loading')v.state='ready';});
+  el.addEventListener('error',()=>{v.state='fail';});
+  el.src='assets/video/jcv_'+k+'.mp4';try{el.load();}catch(e){v.state='fail';}
+  VID[k]=v;return v;
+}
+function vidPreloadMatch(){setTimeout(()=>{if(G&&screen==='play')ultsAvail().forEach(u=>vidLoad(u.id));},1200);}
+function vidPreloadBoss(next){if(next%5===0)vidLoad(next===20?'shogun':'ronin');}
+/* attach a clip to a cut-in object: it waits (poster on screen) until the clip is really playing */
+function vidTry(c,k,isUlt){
+  if(!vidAllowed())return;const v=vidLoad(k);if(!v||v.state==='fail')return;
+  const short=isUlt&&v.seen,off=short?1.0:0,el=v.el;
+  c.vid={v,k,mode:'wait',off,short,base:c.dur,a:0,w:0,isUlt};c.dur=99;
+  try{el.currentTime=off;}catch(e){}
+  el.volume=0.56;el.muted=!save.sound;
+  const fail=()=>{if(c.vid&&c.vid.mode==='wait')c.vid.w=9;};
+  const p=el.play();if(p&&p.catch)p.catch(()=>{if(!el.muted){el.muted=true;const q=el.play();if(q&&q.catch)q.catch(fail);}else fail();});
+}
+function vidStill(c){const V=c.vid;try{V.v.el.pause();}catch(e){}V.mode='still';c.t=0;c.dur=V.base;}
+function vidTick(c,dt){
+  const V=c&&c.vid;if(!V||V.mode==='still')return;const el=V.v.el;V.a+=dt;
+  if(V.v.state==='fail'||el.error){vidStill(c);return;}
+  if(V.mode==='wait'){V.w+=dt;
+    if(!el.paused&&el.readyState>=2&&el.currentTime>V.off+0.01){V.mode='video';c.t=0;c.dur=V.short?1.8:Math.min(3.55,(el.duration||3.6)-V.off-0.05);if(V.isUlt)V.v.seen=true;}
+    else if(V.w>(V.off?0.9:0.4))vidStill(c); // a repeat starts mid-clip, so allow its seek a little longer
+    return;}
+  // follow the clip's own clock, so slow frames never let text and timing drift from the picture
+  if(!paused&&!el.paused){const vt=el.currentTime-V.off;c.t=Math.max(c.t,vt-dt);V.a=Math.max(V.a,V.w+vt);}
+  if(paused&&!el.paused)el.pause();else if(!paused&&el.paused&&c.t<c.dur-0.05&&!el.ended){const p=el.play();if(p&&p.catch)p.catch(()=>{});}
+}
+function vidStop(c){if(c&&c.vid&&c.vid.v){try{c.vid.v.el.pause();}catch(e){}}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const k in VID){try{VID[k].el.pause();}catch(e){}}});
+/* full-frame clip with a diagonal wipe-in, cinematic bars, a readable scrim and the cut-in text bottom-left (board space) */
+function drawVidCut(c,o){
+  const V=c.vid,el=V.v.el,inA=RM?1:ease(Math.min(1,V.a/0.3)),outA=V.mode==='video'?Math.max(0,1-(c.dur-c.t)/0.35):0;
+  ctx.save();ctx.globalAlpha=1-outA;
+  ctx.fillStyle=alpha('#2A1F2E',0.6);ctx.fillRect(0,0,W,H);
+  const ex=lerp(W+260,-260,inA);
+  ctx.save();ctx.beginPath();ctx.moveTo(ex,0);ctx.lineTo(W+20,0);ctx.lineTo(W+20,H);ctx.lineTo(ex-220,H);ctx.closePath();ctx.clip();
+  // poster underneath (first frame), so a frame the decoder hasn't handed over yet never shows the board through
+  ctx.fillStyle='#2A1F2E';ctx.fillRect(0,0,W,H);
+  const z=1.02+(V.mode==='video'&&!RM?0.03*c.t/c.dur:0),blit=src=>{const iw=src.videoWidth||src.naturalWidth,ih=src.videoHeight||src.naturalHeight;if(!iw)return;const s=Math.max(W/iw,H/ih)*z;try{ctx.drawImage(src,(W-iw*s)/2,(H-ih*s)/2,iw*s,ih*s);}catch(e){}};
+  if(V.v.poster.complete&&V.v.poster.naturalWidth)blit(V.v.poster);
+  if(V.mode==='video'&&el.readyState>=2)blit(el);
+  // scrims: left and bottom, so the text always reads
+  let g=ctx.createLinearGradient(0,0,W*0.55,0);g.addColorStop(0,'rgba(30,18,26,0.72)');g.addColorStop(1,'rgba(30,18,26,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  g=ctx.createLinearGradient(0,H*0.45,0,H);g.addColorStop(0,'rgba(30,18,26,0)');g.addColorStop(1,'rgba(30,18,26,0.9)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.restore();
+  // wipe edge accent
+  if(inA<1){ctx.save();ctx.strokeStyle=o.accent;ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(ex,0);ctx.lineTo(ex-220,H);ctx.stroke();ctx.strokeStyle=C.gold;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(ex+14,0);ctx.lineTo(ex-206,H);ctx.stroke();ctx.restore();}
+  // cinematic bars
+  const bh=46*inA;ctx.fillStyle='#1C1218';ctx.fillRect(0,0,W,bh);ctx.fillRect(0,H-bh,W,bh);
+  ctx.fillStyle=o.accent;ctx.fillRect(0,bh-4,W*inA,4);ctx.fillRect(W*(1-inA),H-bh,W*inA,4);
+  // text block
+  const tx=72,ta=Math.min(1,Math.max(0,(V.a-0.12)/0.25)),slide=RM?0:(1-ease(ta))*-60;
+  ctx.save();ctx.globalAlpha*=ta;ctx.translate(slide,0);
+  txt(o.header,tx,H-226,26,{disp:true,col:C.gold,stroke:C.ink,lw:7});
+  if(o.kan){txt(o.kan,tx-4,H-150,o.kan.length>1?104:116,{disp:true,col:o.accent,stroke:C.ink,lw:14});
+    ctx.font=font(104,true);const kw=ctx.measureText(o.kan).width*(o.kan.length>1?1:116/104);txt(o.name,tx+kw+18,H-136,50,{disp:true,col:C.paper,stroke:C.ink,lw:9});}
+  else txt(o.name,tx-2,H-150,96,{disp:true,col:C.paper,stroke:C.ink,lw:15});
+  if(o.line)txt(o.line,tx,H-84,20,{col:C.paper,stroke:C.ink,lw:6});
+  ctx.restore();
+  // katakana pop, top right
+  const pa=Math.min(1,Math.max(0,(V.a-0.25)/0.15)),sc=RM?1:1+(1-pa)*0.8;
+  if(pa>0){ctx.save();ctx.globalAlpha*=pa;ctx.translate(W-250,128);ctx.rotate(-0.1);ctx.scale(sc,sc);txt(o.sfx,4,6,62,{disp:true,align:'center',col:C.ink,stroke:C.ink,lw:14});txt(o.sfx,0,0,62,{disp:true,align:'center',col:C.gold,stroke:C.ink,lw:10});ctx.restore();}
+  ctx.restore();
+  drawSkipHint((1-outA)*Math.min(1,V.a*4));
+}
+
 /* ---------------- cut-ins (board space 1280x720) ----------------
    One queue for boss, new-enemy and new-fusion reveals: the sim pauses while one shows, any click/tap/confirm skips.
    Reduced motion: short fades, no speed lines. Every art use has a drawn fallback. */
@@ -1579,14 +1660,19 @@ const BESTIARY=['grunt','runner','shield','brute','ninja','ronin','shogun'];
 const ART_SHIFT={e_ronin:0.3,u_meteor:0.28,u_tornado:0.1};
 const cutQ=[],revealLog=[];
 function queueCut(c){c.t=0;if(bossCut){if(!cutQ.some(q=>q.kind===c.kind&&q.type===c.type))cutQ.push(c);}else beginCut(c);}
-function beginCut(c){bossCut=c;c.t=0;revealLog.push(c.kind+':'+c.type);if(c.kind==='boss'){sfx('horn');sfx('cutin');}else if(c.kind==='enemy'){sfx('cutin');sfx('gong');}else{sfx('cutin');sfx('ready');}}
-function endCut(){bossCut=null;const n=cutQ.shift();if(n)beginCut(n);}
-function clearCuts(){bossCut=null;cutQ.length=0;}
+function beginCut(c){bossCut=c;c.t=0;revealLog.push(c.kind+':'+c.type);if(c.kind==='boss')vidTry(c,c.type==='shogun'?'shogun':'ronin',false);if(c.kind==='boss'){sfx('horn');sfx('cutin');}else if(c.kind==='enemy'){sfx('cutin');sfx('gong');}else{sfx('cutin');sfx('ready');}}
+function endCut(){vidStop(bossCut);bossCut=null;const n=cutQ.shift();if(n)beginCut(n);}
+function clearCuts(){vidStop(bossCut);vidStop(cutin);bossCut=null;cutQ.length=0;}
 function seeEnemy(type){if(save.seenEnemies.includes(type))return false;save.seenEnemies.push(type);persist();return true;}
 function startBossCut(type){if(!G||G.result)return;const first=seeEnemy(type);queueCut({kind:'boss',type,first,dur:RM?0.9:1.5});}
 function enemyReveal(type){if(!G||G.result)return;if(!seeEnemy(type))return;queueCut({kind:'enemy',type,dur:RM?0.9:1.6});}
 function fusionReveal(type){if(!G||G.result)return;queueCut({kind:'fusion',type,dur:RM?0.9:1.7});}
-function skipCut(){if(bossCut&&bossCut.t<bossCut.dur*0.82)bossCut.t=bossCut.dur*0.82;if(cutin&&cutin.t<cutin.dur*0.8)cutin.t=cutin.dur*0.8;}
+function skipCut(){
+  for(const c of [bossCut,cutin]){if(!c)continue;const V=c.vid;
+    if(V&&V.mode==='wait'){vidStill(c);c.t=c.dur*0.82;}
+    else if(V&&V.mode==='video')c.t=Math.max(c.t,c.dur-0.3);
+    else if(c.t<c.dur*0.82)c.t=c.dur*0.82;}
+}
 function drawSkipHint(alphaV){
   ctx.save();ctx.setTransform(K*US,0,0,K*US,0,0);ctx.globalAlpha=alphaV;
   const lbl=touchy()?'Tap to skip':padActive?'✕ skip':'Click or Enter to skip';ctx.font=font(13,false);const w=ctx.measureText(lbl).width+28;
@@ -1626,6 +1712,7 @@ function drawBand(c,o){
 }
 function drawBossCut(){
   const c=bossCut;
+  if(c.vid&&c.vid.mode!=='still'){const t=c.type,inf=EINFO[t];return drawVidCut(c,{header:c.first?'NEW BOSS':'BOSS',name:E[t].name.toUpperCase(),line:inf.k+' · '+inf.tip,sfx:VID_INFO[t].sfx,accent:t==='shogun'?C.red:'#7C5FA0'});}
   if(c.kind==='fusion')return drawFusionCut(c);
   const t=c.type,inf=EINFO[t]||EINFO.grunt,sh=t==='shogun',boss=c.kind==='boss';
   const art=t==='ronin'?(artOk('e_ronin')?'e_ronin':'shogun'):enemyArt(t);
@@ -1680,6 +1767,7 @@ function drawFusionCut(c){
 }
 /* ultimate cut-in: jc_u_* art on a diagonal band, kanji + katakana on the empty left third */
 function drawCutin(){
+  if(cutin.vid&&cutin.vid.mode!=='still'){const ucol={meteor:C.fire,tsunami:C.water,tornado:C.air}[cutin.u.id];return drawVidCut(cutin,{header:'必殺',kan:cutin.u.k,name:cutin.u.name.toUpperCase(),sfx:cutin.u.sfx,accent:ucol});}
   const c=cutin,u=c.t/c.dur,inA=Math.min(1,u/0.18),outA=u>0.8?(u-0.8)/0.2:0;
   ctx.save();ctx.fillStyle=alpha(C.ink,0.5*(1-outA));ctx.fillRect(0,0,W,H);
   if(RM)ctx.globalAlpha=1-outA;else ctx.translate((1-ease(inA))*W*0.9-outA*W*1.1,0);
@@ -2136,10 +2224,11 @@ function frame(now){
   handleInput();
   updCurtain(dt);
   if(press.t>0)press.t-=dt;
+  if(paused){for(const c of [bossCut,cutin])if(c&&c.vid&&c.vid.mode==='video'&&!c.vid.v.el.paused)c.vid.v.el.pause();}
   if(screen==='play'&&G&&!paused){
     if(G.menu)G.menuT=(G.menuT||0)+dt;
-    if(bossCut){bossCut.t+=dt;if(bossCut.t>=bossCut.dur)endCut();}
-    else if(cutin){cutin.t+=dt;if(cutin.t>=cutin.dur){const f=cutin.then;cutin=null;f();}}
+    if(bossCut){vidTick(bossCut,dt);bossCut.t+=dt;if(bossCut.t>=bossCut.dur)endCut();}
+    else if(cutin){vidTick(cutin,dt);cutin.t+=dt;if(cutin.t>=cutin.dur){const f=cutin.then;vidStop(cutin);cutin=null;f();}}
     else if(!G.result||G.resultT<1){for(let i=0;i<G.speed;i++)update(dt);}
     updateFx(dt);
   }
@@ -2195,7 +2284,7 @@ window.TD={
 };
 /* debug handle for tests and console poking */
 window.__jc={
-  get state(){return{screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
+  get state(){const vc=bossCut&&bossCut.vid?bossCut:cutin&&cutin.vid?cutin:null;return{vid:vc?vc.vid.mode:null,vidKey:vc?vc.vid.k:null,vidT:vc&&vc.vid.v?vc.vid.v.el.currentTime:0,vidDur:vc?vc.dur:0,vidState:Object.fromEntries(Object.keys(VID).map(k=>[k,VID[k].state])),screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
   get G(){return G;},
   ui(){return UI.map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,disabled:!!b.disabled}));},
   // UI-space point -> client (CSS) coords, for synthetic input
@@ -2211,6 +2300,9 @@ window.__jc={
   untilBoss(max){max=max||30;const st=1/30;for(let i=0;i<max/st;i++){while(bossCut&&bossCut.kind!=='boss')endCut();if(bossCut)break;update(st);}return bossCut?bossCut.type:null;},
   untilCut(kind,max){max=max||30;const st=1/30;for(let i=0;i<max/st;i++){if(bossCut&&bossCut.kind===kind)return bossCut.type;if(bossCut)endCut();update(st);}return bossCut&&bossCut.kind===kind?bossCut.type:null;},
   clearCuts(){clearCuts();},
+  video(v){vidForce=v===undefined?null:v;},
+  resetReveals(){save.seenEnemies=[];revealLog.length=0;},
+  preloadVideos(){for(const k in VID_INFO)vidLoad(k);},
   seenAll(){save.seenEnemies=BESTIARY.slice();},
   ult(id,tx,ty){const u=ULTS.find(q=>q.id===id);G.ult.charge=ultNeed();const p=tx!==undefined?{x:tc(tx),y:tc(ty)}:{x:W/2,y:H/2};fireUlt(u,p.x,p.y);},
   win(){if(!G)return;G.spawners=[];G.enemies=[];G.wave=20;endGame(true);},

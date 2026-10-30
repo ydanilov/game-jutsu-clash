@@ -2,8 +2,10 @@
 const http=require('http'),fs=require('fs'),path=require('path');
 const { chromium } = require('playwright');
 const ROOT=path.resolve(__dirname,'..');
-const TYPES={'.html':'text/html','.js':'text/javascript','.webp':'image/webp','.png':'image/png','.css':'text/css','.json':'application/json'};
-function serve(){return new Promise(res=>{const s=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);if(u==='/favicon.ico'){r.writeHead(204);r.end();return;}const f=path.join(ROOT,u);if(!f.startsWith(ROOT)||!fs.existsSync(f)||fs.statSync(f).isDirectory()){r.writeHead(404);r.end('nf');return;}r.writeHead(200,{'content-type':TYPES[path.extname(f)]||'application/octet-stream'});fs.createReadStream(f).pipe(r);});s.listen(0,()=>res({s,url:'http://localhost:'+s.address().port+'/tools/test.html'}));});}
+const TYPES={'.html':'text/html','.js':'text/javascript','.webp':'image/webp','.png':'image/png','.css':'text/css','.json':'application/json','.mp4':'video/mp4'};
+function serve(){return new Promise(res=>{const s=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);if(u==='/favicon.ico'){r.writeHead(204);r.end();return;}const f=path.join(ROOT,u);if(!f.startsWith(ROOT)||!fs.existsSync(f)||fs.statSync(f).isDirectory()){r.writeHead(404);r.end('nf');return;}const ty=TYPES[path.extname(f)]||'application/octet-stream',size=fs.statSync(f).size,rg=/bytes=(\d*)-(\d*)/.exec(q.headers.range||'');
+  if(rg){const st=rg[1]?+rg[1]:0,en=rg[2]?+rg[2]:size-1;r.writeHead(206,{'content-type':ty,'accept-ranges':'bytes','content-range':'bytes '+st+'-'+en+'/'+size,'content-length':en-st+1});fs.createReadStream(f,{start:st,end:en}).pipe(r);return;}
+  r.writeHead(200,{'content-type':ty,'accept-ranges':'bytes','content-length':size});fs.createReadStream(f).pipe(r);});s.listen(0,()=>res({s,url:'http://localhost:'+s.address().port+'/tools/test.html'}));});}
 function exe(){const c=['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome'];for(const p of c)if(fs.existsSync(p))return p;return undefined;}
 async function launch(){return chromium.launch({executablePath:exe(),args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--autoplay-policy=no-user-gesture-required']});}
 function watch(page,errs){
