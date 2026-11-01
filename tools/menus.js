@@ -32,7 +32,8 @@ async function run(b,url,vp,tag,touch,fails){
     await tap('map'+mi,50);await L.settle(p);await p.waitForTimeout(1600);
     const s=await st();L.check(s.screen==='play'&&s.wave===0,'map '+mi+' starts',fails);
     await S('1'+mi+'_play_map'+mi);
-    {const g=await st();L.check(g.painted&&g.grid==='off'&&g.gridOp<0.01,'map '+mi+' painted, grid hidden by default',fails);}
+    {const g=await st();L.check(g.painted&&g.grid==='off'&&g.gridOp<0.01,'map '+mi+' painted, grid hidden by default',fails);
+     if(mi===0){const pv=g.preview;L.check(pv.length>0&&pv[0].t==='grunt'&&pv[0].n>0&&pv[0].art&&!pv[0].seen,'next-wave preview shows wave 1 with icons, unseen = silhouette '+JSON.stringify(pv),fails);}}
     if(mi<2){await p.evaluate(()=>window.__jc.go('maps'));await p.waitForTimeout(400);}
   }
   // build each base tower by tapping tiles and the radial menu
@@ -70,6 +71,8 @@ async function run(b,url,vp,tag,touch,fails){
    await p.waitForTimeout(400);s=await st();L.check(s.towers.length===2&&s.codex.length===2,'drag fusion made ('+s.codex.join(',')+')',fails);await L.waitCut(p,'fusion');await L.skipCut(p,touch);}
   // ultimate + wave button states
   await tap('next',300);await L.waitCut(p,'enemy');await S('27_enemy_reveal');L.check((await st()).cutType==='grunt','new-enemy reveal for the grunt',fails);await L.skipCut(p,touch);await p.waitForTimeout(800);await S('27_wave1');
+  {const pv=(await st()).preview;L.check(pv.some(q=>q.t==='grunt'&&q.seen),'preview shows the grunt portrait once met '+JSON.stringify(pv),fails);}
+  {const c=await p.evaluate(()=>window.__jc.center('pv_grunt'));if(touch)await p.touchscreen.tap(c.x,c.y);else await p.mouse.move(c.x,c.y);for(let k=0;k<4;k++)await L.frames(p,2);await S('28_preview_tip');}
   // pause, settings, quit
   await tap('pause',300);L.check((await st()).paused,'pause opens',fails);await p.waitForTimeout(300);await S('30_pause');
   if(!touch){await p.keyboard.press('ArrowDown');await L.frames(p,6);await S('31_pause_focus');}

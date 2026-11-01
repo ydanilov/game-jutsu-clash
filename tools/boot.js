@@ -29,7 +29,9 @@ const L=require('./lib');
   L.check(Object.values(st2).every(v=>v==='fail'),'blocked art reported as failed',fails);
   await p2.keyboard.press('Enter');await L.settle(p2);
   await p2.evaluate(()=>window.__jc.go('maps'));await p2.waitForTimeout(500);await L.shot(p2,'boot_fallback_maps');
-  await p2.evaluate(()=>{window.__jc.startMap(0);window.__jc.win();});await p2.waitForTimeout(1800);await L.shot(p2,'boot_fallback_win');
+  await p2.evaluate(()=>{window.__jc.instant(true);window.__jc.startMap(0);});await L.frames(p2,4);await L.shot(p2,'boot_fallback_preview');
+  {const pv=await p2.evaluate(()=>window.__jc.state.preview);L.check(pv.length>0&&pv.every(q=>!q.art),'wave preview falls back to drawn icons without art',fails);}
+  await p2.evaluate(()=>{window.__jc.win();});await p2.waitForTimeout(1800);await L.shot(p2,'boot_fallback_win');
   L.check(errs2.length===0,'no errors without art '+errs2.join(' | '),fails);
   L.check(errs.length===0,'no console errors '+errs.join(' | '),fails);
   await b.close();s.close();

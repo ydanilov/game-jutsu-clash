@@ -1282,7 +1282,7 @@ function ctl(id,x,y,w,h,o={}){
   const foc=!ghost&&focusId===id&&nav();
   const prs=!o.disabled&&((ptr.down&&ptr.down.ui===id&&over)||(press.id===id&&press.t>0));
   const tgt=(hov||foc||prs)?1:0;HOTA[id]=RM?tgt:lerp(HOTA[id]===undefined?0:HOTA[id],tgt,Math.min(1,frameDt*16));
-  if((hov||foc)&&o.tip)TIPQ=Object.assign({ax:x+w/2,ay:y,below:o.tipBelow},o.tip);
+  if((hov||foc)&&o.tip)TIPQ=Object.assign({ax:x+w/2,ay:o.tipBelow?y+h:y,below:o.tipBelow},o.tip);
   return{hov,foc,prs,dis:!!o.disabled,sel:!!o.sel,k:HOTA[id],on:!o.disabled&&(hov||foc||prs),b};
 }
 function focusRing(x,y,w,h,r){ctx.save();const p=RM?0:(Math.sin(animT*6)*0.5+0.5)*2;ctx.lineWidth=4;ctx.strokeStyle=C.gold;rrect(x-5-p,y-5-p,w+10+2*p,h+10+2*p,r+5+p);ctx.stroke();ctx.lineWidth=2;ctx.strokeStyle=C.ink;rrect(x-8-p,y-8-p,w+16+2*p,h+16+2*p,r+8+p);ctx.stroke();ctx.restore();}
@@ -1433,6 +1433,7 @@ function drawHUD(){
   if(showP)prompt('next',nx+(padActive?30:38),42,12);
   if(can&&eb){ctx.save();ctx.translate(nx+bw-36,74);if(!RM)ctx.rotate(-0.08);panel(-34,-11,70,22,{fill:C.gold,r:11,lw:2,shadow:false});txt('+'+eb,0,1,13,{align:'center'});ctx.restore();}
   if(!can&&!done&&G.spawners.length){txt('sending…',nx+bw/2,84,12,{align:'center',col:C.ink,stroke:C.paper,lw:3});}
+  drawWavePreview(VW-14,tch?96:94);
   // ultimate panel: charging -> ready (gold pulse) -> aiming; chips show which ultimates are unlocked
   const u=curUlt(),need=ultNeed(),fr=G.ult.charge/need,ready=fr>=1,aim=G.targeting;
   const uw=cmp?250:272,uh=96,ux=14,uy=VH-uh-16;
@@ -1467,8 +1468,8 @@ function drawHUD(){
   if(av.length>1&&!tch&&!cmp){txt('switch',ux+16,uy-2,11,{col:C.ink,stroke:C.paper,lw:4});prompt('cycle',ux+62,uy-2,10);}
   // boss bar
   const boss=G.enemies.find(e=>e.boss);
-  if(boss){const left=ux+uw+24,bw2=Math.min(360,VW-left-24),bx=cmp?left:Math.max(left,VW/2-bw2/2),by=VH-40;panel(bx-10,by-18,bw2+20,40,{fill:C.ink,r:20});txt(E[boss.type].name.toUpperCase(),bx+8,by+1,14,{disp:true,col:C.paper});if(boss.el){ctx.fillStyle=C[boss.el];circle(bx+112,by+1,9);ctx.fill();txt(EL[boss.el].k,bx+112,by+1.5,10,{disp:true,col:C.paper,align:'center'});}
-    ctx.fillStyle=C.paper;rrect(bx+132,by-5,bw2-138,12,6);ctx.fill();ctx.fillStyle=C.red;rrect(bx+134,by-3,Math.max(3,(bw2-142)*boss.hp/boss.maxHp),8,4);ctx.fill();}
+  if(boss){const left=ux+uw+24,bw2=Math.min(360,VW-left-24),bx=cmp?left:Math.max(left,VW/2-bw2/2),by=VH-40;panel(bx-10,by-18,bw2+20,40,{fill:C.ink,r:20});enemyIcon(boss.type,bx-2,by+1,21,{ring:boss.el?C[boss.el]:C.gold,shadow:false});txt(E[boss.type].name.toUpperCase(),bx+26,by+1,14,{disp:true,col:C.paper});if(boss.el){ctx.fillStyle=C[boss.el];circle(bx+122,by+1,9);ctx.fill();txt(EL[boss.el].k,bx+122,by+1.5,10,{disp:true,col:C.paper,align:'center'});}
+    ctx.fillStyle=C.paper;rrect(bx+140,by-5,bw2-146,12,6);ctx.fill();ctx.fillStyle=C.red;rrect(bx+142,by-3,Math.max(3,(bw2-150)*boss.hp/boss.maxHp),8,4);ctx.fill();}
   else{
     const hx=VW-16,hy=VH-22,maxW=VW-(ux+uw+40);let parts;
     if(G.fuseFrom||G.drag||G.targeting)parts=null;
@@ -1557,12 +1558,60 @@ function drawBanner(){
   if(b.sub)txt(b.sub,VW/2,by+62,14,{align:'center',col:C.gold});
   ctx.restore();
 }
+/* ---------------- enemy portrait icons ----------------
+   Round face crops from the enemy cards (pre-cut once to 128 px canvases), ink outline + coloured ring (gold for bosses).
+   Unseen types: a dark blurred disc with "?". Without the art: the old kanji medallion. */
+const EFACE={grunt:[790,200,125],runner:[795,165,110],shield:[830,190,120],brute:[752,195,115],ninja:[700,165,95],ronin:[640,175,150],shogun:[760,225,160]};
+const EICON={},EICON_S={};
+function enemyFace(t,sil){
+  const store=sil?EICON_S:EICON;if(store[t])return store[t];
+  const k=enemyArt(t),f=EFACE[t];if(!f||!artOk(k))return null;
+  try{const n=sil?12:128,c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d');
+    x.drawImage(ART[k].im,f[0]-f[2],f[1]-f[2],f[2]*2,f[2]*2,0,0,n,n);store[t]=c;return c;}catch(e){return null;}
+}
+const isBoss=t=>!!(E[t]&&E[t].boss);
+function enemyIcon(t,x,y,r,o={}){
+  const seen=o.seen!==false,inf=EINFO[t]||EINFO.grunt,ring=o.ring||(isBoss(t)?C.gold:inf.accent);
+  ctx.save();
+  if(o.shadow!==false){ctx.fillStyle=alpha(C.ink,0.3);circle(x,y+r*0.12,r);ctx.fill();}
+  ctx.fillStyle=ring;circle(x,y,r);ctx.fill();ctx.lineWidth=Math.max(1.5,r*0.1);ctx.strokeStyle=C.ink;ctx.stroke();
+  const ir=r*0.78;ctx.save();circle(x,y,ir);ctx.clip();
+  const face=enemyFace(t,!seen);
+  if(face){ctx.imageSmoothingEnabled=true;ctx.drawImage(face,x-ir,y-ir,ir*2,ir*2);if(!seen){ctx.fillStyle=alpha('#2A1F2E',0.78);ctx.fillRect(x-ir,y-ir,ir*2,ir*2);}}
+  else{ctx.fillStyle=seen?inf.accent:'#4A3A48';ctx.fillRect(x-ir,y-ir,ir*2,ir*2);if(seen)txt(inf.k[0],x,y+1,ir*1.05,{disp:true,align:'center',col:C.paper,stroke:C.ink,lw:Math.max(2,ir*0.18)});}
+  ctx.restore();
+  if(!seen)txt('?',x,y+1,ir*1.25,{disp:true,align:'center',col:C.paper,stroke:C.ink,lw:Math.max(2,ir*0.2)});
+  ctx.lineWidth=Math.max(1.2,r*0.07);ctx.strokeStyle=C.ink;circle(x,y,ir);ctx.stroke();
+  if(o.count){const s='×'+o.count,fs=Math.max(11,r*0.62);ctx.font=font(fs,false);const w=ctx.measureText(s).width+10;panel(x+r*0.35,y+r*0.25,w,fs+6,{fill:C.paper,r:(fs+6)/2,lw:2,shadow:false});txt(s,x+r*0.35+w/2,y+r*0.25+(fs+6)/2+1,fs,{align:'center'});}
+  ctx.restore();
+}
+/* next-wave preview under the wave button: icons with counts; hover (or tap) for the tip */
+let previewSel=null,lastPreview=[];
+function waveComp(n){const m=new Map();for(const it of makeWave(n))m.set(it.type,(m.get(it.type)||0)+1);return [...m.entries()];}
+function drawWavePreview(rightX,topY){
+  lastPreview=[];
+  if(!G||G.wave>=20||G.result||G.fuseFrom||G.targeting||G.drag)return;
+  const n=G.wave+1,comp=waveComp(n),tch=touchy(),r=tch?18:20,step=tch?60:64,lbl=G.wave===0?'WAVE 1':'NEXT · W'+n;
+  ctx.font=font(12,false);const lw=ctx.measureText(lbl).width+18;
+  const w=lw+comp.length*step+6,h=r*2+14,x=rightX-w,y=topY;
+  panel(x,y,w,h,{fill:alpha(C.paper,0.94),r:h/2,lw:2.5});
+  txt(lbl,x+12,y+h/2+1,12,{col:n%5===0?C.red:C.ink});
+  comp.forEach(([t,c],i)=>{
+    const cx=x+lw+i*step+r+4,cy=y+h/2,seen=save.seenEnemies.includes(t),inf=EINFO[t],e=E[t];
+    lastPreview.push({t,n:c,seen,art:!!enemyFace(t,!seen)});
+    const tipO=seen?{title:inf.k+' '+e.name+' ×'+c,lines:[inf.tip],accent:isBoss(t)?C.gold:inf.accent,w:250}:{title:'Unknown enemy ×'+c,lines:['You haven’t met this one yet. Watch the road!'],accent:C.tone,w:240};
+    const s=ctl('pv_'+t,cx-r-2,cy-r-2,r*2+4+ (tch?14:10),r*2+4,{hud:true,act:()=>{previewSel=previewSel&&previewSel.t===t?null:{t,until:animT+3.5,tip:tipO,ax:cx};sfx('click');},tip:tch?null:Object.assign({},tipO),tipBelow:true});
+    enemyIcon(t,cx,cy-(s.on?1.5:0),r*(s.on?1.08:1),{seen,count:c});
+  });
+  if(previewSel){if(animT>previewSel.until||!comp.some(([t])=>t===previewSel.t))previewSel=null;else TIPQ=Object.assign({ax:previewSel.ax,ay:y+h,below:true},previewSel.tip);}
+}
+
 /* ---------------- video cut-ins (Veo clips, 854x480 H.264, ~3.6 s) ----------------
    Ultimates and the two bosses play a clip inside the cut-in. Loaded lazily once a match starts (ultimates) or just before
    a boss wave. If a clip can't start within 0.4 s (error, autoplay blocked, slow network) the still-art cut-in runs instead.
    Reduced motion, QLOW (phones, low-end) and data-saver always use the stills. */
 const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
-let vidForce=null; // tests: true = allow on any device, false = block
+let vidForce=null,vidWaitK=1; // vidWaitK: tests on slow software GL stretch the start-up window // tests: true = allow on any device, false = block
 function vidAllowed(){if(vidForce!==null)return vidForce;const c=navigator.connection;return !RM&&!QLOW&&!(c&&c.saveData);}
 function vidLoad(k){
   if(!vidAllowed()||!VID_INFO[k])return null;if(VID[k])return VID[k];
@@ -1592,7 +1641,7 @@ function vidTick(c,dt){
   if(V.v.state==='fail'||el.error){vidStill(c);return;}
   if(V.mode==='wait'){V.w+=dt;
     if(!el.paused&&el.readyState>=2&&el.currentTime>V.off+0.01){V.mode='video';c.t=0;c.dur=V.short?1.8:Math.min(3.55,(el.duration||3.6)-V.off-0.05);if(V.isUlt)V.v.seen=true;}
-    else if(V.w>(V.off?0.9:0.4))vidStill(c); // a repeat starts mid-clip, so allow its seek a little longer
+    else if(V.w>(V.off?0.9:0.4)*vidWaitK)vidStill(c); // a repeat starts mid-clip, so allow its seek a little longer
     return;}
   // follow the clip's own clock, so slow frames never let text and timing drift from the picture
   if(!paused&&!el.paused){const vt=el.currentTime-V.off;c.t=Math.max(c.t,vt-dt);V.a=Math.max(V.a,V.w+vt);}
@@ -1624,6 +1673,7 @@ function drawVidCut(c,o){
   // text block
   const tx=72,ta=Math.min(1,Math.max(0,(V.a-0.12)/0.25)),slide=RM?0:(1-ease(ta))*-60;
   ctx.save();ctx.globalAlpha*=ta;ctx.translate(slide,0);
+  if(o.icon)enemyIcon(o.icon,W-112,H-150,52);
   txt(o.header,tx,H-226,26,{disp:true,col:C.gold,stroke:C.ink,lw:7});
   if(o.kan){txt(o.kan,tx-4,H-150,o.kan.length>1?104:116,{disp:true,col:o.accent,stroke:C.ink,lw:14});
     ctx.font=font(104,true);const kw=ctx.measureText(o.kan).width*(o.kan.length>1?1:116/104);txt(o.name,tx+kw+18,H-136,50,{disp:true,col:C.paper,stroke:C.ink,lw:9});}
@@ -1694,6 +1744,7 @@ function drawBand(c,o){
   else{ctx.fillStyle=o.accent;ctx.beginPath();ctx.arc(900,370,190,0,TAU);ctx.fill();ctx.lineWidth=8;ctx.strokeStyle=C.ink;ctx.stroke();txt(o.kan[0],900,380,220,{disp:true,align:'center',col:C.paper,stroke:C.ink,lw:18});}
   if(!RM){const ga=ctx.globalAlpha;for(let i=0;i<46;i++){const y=top-20+i*10+((i*37)%9),x0=((i*173)%600)-200+(animT*2200+i*90)%700;ctx.globalAlpha=ga*0.5;ctx.strokeStyle=i%3?o.accent2:o.accent;ctx.lineWidth=1+(i%4);ctx.beginPath();ctx.moveTo(x0-500,y+16);ctx.lineTo(x0+260+((i*53)%260),y-14);ctx.stroke();}ctx.globalAlpha=ga;}
   const tx=120;
+  if(o.icon)enemyIcon(o.icon,W-118,H-170,58,{ring:o.ring});
   txt(o.header,tx,262,30,{disp:true,col:o.accent2,stroke:C.ink,lw:8});
   ctx.font=font(108,true);const nsz=Math.min(108,108*560/Math.max(1,ctx.measureText(o.name).width));
   txt(o.name,tx-4,352,nsz,{disp:true,col:C.paper,stroke:C.ink,lw:nsz*0.17});
@@ -1705,13 +1756,13 @@ function drawBand(c,o){
 }
 function drawBossCut(){
   const c=bossCut;
-  if(c.vid&&c.vid.mode!=='still'){const t=c.type,inf=EINFO[t];return drawVidCut(c,{header:c.first?'NEW BOSS':'BOSS',name:E[t].name.toUpperCase(),line:inf.k+' · '+inf.tip,sfx:VID_INFO[t].sfx,accent:t==='shogun'?C.red:'#7C5FA0'});}
+  if(c.vid&&c.vid.mode!=='still'){const t=c.type,inf=EINFO[t];return drawVidCut(c,{icon:t,header:c.first?'NEW BOSS':'BOSS',name:E[t].name.toUpperCase(),line:inf.k+' · '+inf.tip,sfx:VID_INFO[t].sfx,accent:t==='shogun'?C.red:'#7C5FA0'});}
   if(c.kind==='fusion')return drawFusionCut(c);
   const t=c.type,inf=EINFO[t]||EINFO.grunt,sh=t==='shogun',boss=c.kind==='boss';
   const art=t==='ronin'?(artOk('e_ronin')?'e_ronin':'shogun'):enemyArt(t);
   drawBand(c,{art,band:sh?'#3B1F24':boss?'#2E2440':'#2E2A35',accent:boss?(sh?C.red:'#7C5FA0'):inf.accent,accent2:C.gold,
     tint:t==='ronin'&&art==='shogun'?alpha('#7C5FA0',0.35):null,
-    header:boss?(c.first?'NEW BOSS':'BOSS'):'NEW ENEMY',name:E[t].name.toUpperCase(),kan:inf.k,line:inf.k+' · '+inf.tip,sfx:inf.sfx});
+    icon:t,header:boss?(c.first?'NEW BOSS':'BOSS'):'NEW ENEMY',name:E[t].name.toUpperCase(),kan:inf.k,line:inf.k+' · '+inf.tip,sfx:inf.sfx});
 }
 /* new fusion: the tower card flies in with sparkles, name + kanji on the left */
 function sparkle(x,y,r,col){ctx.save();ctx.translate(x,y);ctx.fillStyle=col;ctx.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,rr=i%2?r*0.28:r;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}ctx.closePath();ctx.fill();ctx.restore();}
@@ -2081,9 +2132,10 @@ function drawBestiary(cmp,nb){
     ctx.restore();ctx.lineWidth=2.5;ctx.strokeStyle=C.ink;rrect(ax,ay,aw,ah,14);ctx.stroke();
     if(seen&&e.boss){const bw=cmp?44:54;panel(ax+aw-bw-6,ay+6,bw,cmp?20:24,{fill:C.red,r:12,lw:2,shadow:false});txt('BOSS',ax+aw-bw/2-6,ay+6+(cmp?10:12)+1,cmp?10:12,{align:'center',col:C.paper});}
     const ny=ay+ah+(cmp?15:22);
-    if(seen){ctx.fillStyle=inf.accent;circle(ax+11,ny,cmp?8:10);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=C.ink;ctx.stroke();txt(e.name,ax+(cmp?24:28),ny+1,cmp?14:19,{disp:true});
+    if(seen){enemyIcon(t,ax+(cmp?12:15),ny,cmp?12:15,{shadow:false});txt(e.name,ax+(cmp?30:38),ny+1,cmp?14:19,{disp:true});
       if(!cmp)wrapText(inf.tip,ax+2,ny+26,aw-4,12,15,{col:alpha(C.ink,0.8)});}
-    else txt('Not met yet',x+cw/2,ny+1,cmp?12:17,{disp:true,align:'center',col:alpha(C.ink,0.6)});
+    else{enemyIcon(t,ax+(cmp?12:15),ny,cmp?12:15,{seen:false,shadow:false});}
+    if(!seen)txt('Not met yet',x+cw/2,ny+1,cmp?12:17,{disp:true,align:'center',col:alpha(C.ink,0.6)});
     if(s.foc)focusRing(x,y+lift,cw,ch,20);
     ctx.restore();
     if(sel&&touchy()&&!s.hov)TIPQ=Object.assign({ax:x+cw/2,ay:y},tipO);
@@ -2277,7 +2329,7 @@ window.TD={
 };
 /* debug handle for tests and console poking */
 window.__jc={
-  get state(){const vc=bossCut&&bossCut.vid?bossCut:cutin&&cutin.vid?cutin:null;return{vid:vc?vc.vid.mode:null,vidKey:vc?vc.vid.k:null,vidT:vc&&vc.vid.v?vc.vid.v.el.currentTime:0,vidDur:vc?vc.dur:0,vidState:Object.fromEntries(Object.keys(VID).map(k=>[k,VID[k].state])),screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
+  get state(){const vc=bossCut&&bossCut.vid?bossCut:cutin&&cutin.vid?cutin:null;return{vid:vc?vc.vid.mode:null,vidKey:vc?vc.vid.k:null,vidT:vc&&vc.vid.v?vc.vid.v.el.currentTime:0,vidDur:vc?vc.dur:0,preview:lastPreview.slice(),vidState:Object.fromEntries(Object.keys(VID).map(k=>[k,VID[k].state])),screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
   get G(){return G;},
   ui(){return UI.map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,disabled:!!b.disabled}));},
   // UI-space point -> client (CSS) coords, for synthetic input
@@ -2293,7 +2345,7 @@ window.__jc={
   untilBoss(max){max=max||30;const st=1/30;for(let i=0;i<max/st;i++){while(bossCut&&bossCut.kind!=='boss')endCut();if(bossCut)break;update(st);}return bossCut?bossCut.type:null;},
   untilCut(kind,max){max=max||30;const st=1/30;for(let i=0;i<max/st;i++){if(bossCut&&bossCut.kind===kind)return bossCut.type;if(bossCut)endCut();update(st);}return bossCut&&bossCut.kind===kind?bossCut.type:null;},
   clearCuts(){clearCuts();},
-  video(v){vidForce=v===undefined?null:v;},
+  video(v,waitK){vidForce=v===undefined?null:v;vidWaitK=waitK||1;},
   resetReveals(){save.seenEnemies=[];revealLog.length=0;},
   preloadVideos(){for(const k in VID_INFO)vidLoad(k);},
   seenAll(){save.seenEnemies=BESTIARY.slice();},

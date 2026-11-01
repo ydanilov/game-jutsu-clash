@@ -17,6 +17,7 @@ Chibi stick-man ninjas guard a floating shrine island. Build Fire, Water, Earth 
 - Painted islands: hand-painted ground and soft, winding roads; the build grid only appears while you choose a spot.
 - Anime cut-ins: bosses (Ronin every 5th wave, Shogun on wave 20), every new enemy type the first time it shows up, every new fusion ("NEW JUTSU!") and each ultimate. All skippable.
 - Animated (video) cut-ins for the three ultimates and both bosses on desktop and tablets; phones, reduced motion and data-saver use the painted stills.
+- Next-wave preview with enemy portraits and counts (tap or hover for a tip); unknown enemies stay a "?" until you meet them.
 - Tower art in the build menu, upgrade card, fuse preview and codex; a Bestiary tab for the enemies you have met.
 - Plays with mouse, keyboard, touch or a DualShock 4. Phones play in landscape.
 - Settings for music, sound, reduced motion, UI size and graphics quality. Progress is saved in the browser.

@@ -8,7 +8,7 @@ const L=require('./lib');
   await p.evaluate(()=>{window.__jc.instant(true);window.__jc.video(false);});
   // video cut-ins (forced on: headless counts as a low-end device, which uses the stills)
   console.log('== video cut-ins');
-  await p.evaluate(()=>{window.__jc.video(true);window.__jc.startMap(0);window.__jc.preloadVideos();});
+  await p.evaluate(()=>{window.__jc.video(true,4);window.__jc.startMap(0);window.__jc.preloadVideos();});
   await p.waitForFunction(()=>Object.values(window.__jc.state.vidState).every(v=>v!=='loading'),null,{timeout:90000});
   const vs=await p.evaluate(()=>window.__jc.state.vidState);L.check(Object.values(vs).every(v=>v==='ready'),'all 5 clips load '+JSON.stringify(vs),fails);
   const vidPlay=async(label,shot)=>{
