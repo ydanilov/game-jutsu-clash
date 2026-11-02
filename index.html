@@ -745,7 +745,7 @@ function callWave(){
   if(!canCallWave()){sfx('deny');return false;}
   const b=earlyBonus();if(b){G.gold+=b;addTextS(VW-170,140,'+'+b+' early',18,C.gold);}
   G.wave++;const list=makeWave(G.wave);G.waveLeft[G.wave]=list.length;G.spawners.push({wave:G.wave,list,i:0,t:0});
-  vidPreloadBoss(G.wave);vidPreloadBoss(G.wave+1);if(G.wave>=18)vidLoad('victory');
+  vidPreloadBoss(G.wave);vidPreloadBoss(G.wave+1);vidPreloadEnemies(G.wave);vidPreloadEnemies(G.wave+1);if(G.wave>=18)vidLoad('victory');
   sfx('gong');banner(G.wave===20?'FINAL WAVE':'WAVE '+G.wave,G.wave%5===0?'A boss is coming':'');
   MUS.mode=G.wave%5===0?'boss':'play';
   return true;
@@ -1618,7 +1618,7 @@ function drawWavePreview(rightX,topY){
    Ultimates and the two bosses play a clip inside the cut-in. Loaded lazily once a match starts (ultimates) or just before
    a boss wave. If a clip can't start within 0.4 s (error, autoplay blocked, slow network) the still-art cut-in runs instead.
    Reduced motion, QLOW (phones, low-end) and data-saver always use the stills. */
-const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},victory:{},defeat:{},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
+const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},victory:{},defeat:{},e_grunt:{},e_runner:{},e_shield:{},e_brute:{},e_ninja:{},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
 let vidForce=null,vidWaitK=1; // vidWaitK: tests on slow software GL stretch the start-up window // tests: true = allow on any device, false = block
 function vidAllowed(){if(vidForce!==null)return vidForce;const c=navigator.connection;return !RM&&!QLOW&&!(c&&c.saveData);}
 function vidLoad(k){
@@ -1631,7 +1631,9 @@ function vidLoad(k){
   el.src='assets/video/jcv_'+k+'.mp4';try{el.load();}catch(e){v.state='fail';}
   VID[k]=v;return v;
 }
-function vidPreloadMatch(){setTimeout(()=>{if(G&&screen==='play')ultsAvail().forEach(u=>vidLoad(u.id));},1200);}
+function vidPreloadMatch(){setTimeout(()=>{if(G&&screen==='play'){ultsAvail().forEach(u=>vidLoad(u.id));vidPreloadEnemies(1);}},1200);}
+/* new-enemy clips: load a type's clip when the wave that first brings it (or the one before) is called */
+function vidPreloadEnemies(n){if(n>20)return;for(const [t] of waveComp(n))if(!E[t].boss&&!save.seenEnemies.includes(t))vidLoad('e_'+t);}
 function vidPreloadBoss(next){if(next%5===0)vidLoad(next===20?'shogun':'ronin');}
 /* attach a clip to a cut-in object: it waits (poster on screen) until the clip is really playing */
 function vidTry(c,k,isUlt){
@@ -1732,7 +1734,7 @@ const BESTIARY=['grunt','runner','shield','brute','ninja','ronin','shogun'];
 const ART_SHIFT={e_ronin:0.3,u_meteor:0.28,u_tornado:0.1};
 const cutQ=[],revealLog=[];
 function queueCut(c){c.t=0;if(bossCut){if(!cutQ.some(q=>q.kind===c.kind&&q.type===c.type))cutQ.push(c);}else beginCut(c);}
-function beginCut(c){bossCut=c;c.t=0;revealLog.push(c.kind+':'+c.type);if(c.kind==='boss')vidTry(c,c.type==='shogun'?'shogun':'ronin',false);if(c.kind==='boss'){sfx('horn');sfx('cutin');}else if(c.kind==='enemy'){sfx('cutin');sfx('gong');}else{sfx('cutin');sfx('ready');}}
+function beginCut(c){bossCut=c;c.t=0;revealLog.push(c.kind+':'+c.type);if(c.kind==='boss')vidTry(c,c.type==='shogun'?'shogun':'ronin',false);else if(c.kind==='enemy'&&VID_INFO['e_'+c.type])vidTry(c,'e_'+c.type,false);if(c.kind==='boss'){sfx('horn');sfx('cutin');}else if(c.kind==='enemy'){sfx('cutin');sfx('gong');}else{sfx('cutin');sfx('ready');}}
 function endCut(){vidStop(bossCut);bossCut=null;const n=cutQ.shift();if(n)beginCut(n);}
 function clearCuts(){vidStop(bossCut);vidStop(cutin);bossCut=null;cutQ.length=0;}
 function seeEnemy(type){if(save.seenEnemies.includes(type))return false;save.seenEnemies.push(type);persist();return true;}
@@ -1785,7 +1787,7 @@ function drawBand(c,o){
 }
 function drawBossCut(){
   const c=bossCut;
-  if(c.vid&&c.vid.mode!=='still'){const t=c.type,inf=EINFO[t];return drawVidCut(c,{icon:t,header:c.first?'NEW BOSS':'BOSS',name:E[t].name.toUpperCase(),line:inf.k+' · '+inf.tip,sfx:VID_INFO[t].sfx,accent:t==='shogun'?C.red:'#7C5FA0'});}
+  if(c.vid&&c.vid.mode!=='still'){const t=c.type,inf=EINFO[t];return drawVidCut(c,{icon:t,header:c.kind==='enemy'?'NEW ENEMY':c.first?'NEW BOSS':'BOSS',name:E[t].name.toUpperCase(),line:inf.k+' · '+inf.tip,sfx:(VID_INFO[t]&&VID_INFO[t].sfx)||inf.sfx,accent:c.kind==='enemy'?inf.accent:t==='shogun'?C.red:'#7C5FA0'});}
   if(c.kind==='fusion')return drawFusionCut(c);
   const t=c.type,inf=EINFO[t]||EINFO.grunt,sh=t==='shogun',boss=c.kind==='boss';
   const art=t==='ronin'?(artOk('e_ronin')?'e_ronin':'shogun'):enemyArt(t);

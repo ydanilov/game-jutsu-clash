@@ -32,6 +32,16 @@ const L=require('./lib');
   L.check((await p.evaluate(()=>window.__jc.state.vidKey))==='ronin','ronin cut-in uses its clip',fails);await vidPlay('ronin','run_video_ronin');
   await p.evaluate(()=>{window.__jc.clearCuts();window.__jc.skipToWave(20);let k=null;for(let i=0;i<10&&k!=='shogun';i++){k=window.__jc.untilBoss(40);if(k&&k!=='shogun')window.__jc.clearCuts();}});
   L.check((await p.evaluate(()=>window.__jc.state.vidKey))==='shogun','shogun cut-in uses its clip',fails);await vidPlay('shogun','run_video_shogun');
+  // new-enemy reveal clips
+  await p.waitForFunction(()=>Object.values(window.__jc.state.vidState).every(v=>v!=='loading'),null,{timeout:90000});
+  for(const [w,t] of [[1,'grunt'],[3,'runner'],[6,'shield'],[8,'brute'],[11,'ninja']]){
+    await p.evaluate(([w,t])=>{window.__jc.clearCuts();window.__jc.resetReveals();window.__jc.startMap(0);window.__jc.preloadVideos();window.__jc.seenAll();
+      const S=TD.save;S.seenEnemies=S.seenEnemies.filter(x=>x!==t);window.__jc.skipToWave(w);window.__jc.untilCut('enemy',40);},[w,t]);
+    let st;for(let k=0;k<80;k++){st=await p.evaluate(()=>window.__jc.state);if(st.vid!=='wait'&&(st.vid!=='video'||st.vidT>1.6))break;await L.frames(p,1);}
+    L.check(st.cutType===t&&st.vidKey==='e_'+t&&st.vid==='video','new-enemy reveal plays its clip: '+t+' ('+st.vidKey+' '+st.vid+')',fails);
+    if(t==='grunt'||t==='brute')await L.shot(p,'run_video_e_'+t);
+    await L.skipCut(p);L.check(!(await p.evaluate(()=>window.__jc.state.cut)),t+' reveal clip skippable',fails);
+  }
   // result screens: victory / defeat clips, then hold
   for(const [mode,shot] of [['win','run_video_victory'],['lose','run_video_defeat']]){
     await p.evaluate(m=>{window.__jc.clearCuts();window.__jc.startMap(0);m==='win'?window.__jc.win():window.__jc.lose();},mode);
@@ -49,7 +59,10 @@ const L=require('./lib');
    L.check(!(await p2.evaluate(()=>window.__jc.state.cutin)),'still fallback skippable',fails);
    await p2.evaluate(()=>{window.__jc.video();window.__jc.reducedMotion(true);window.__jc.clearCuts();const t=window.__jc.freeTiles(1)[0];window.__jc.ult('tsunami',t.tx,t.ty);});
    L.check((await p2.evaluate(()=>window.__jc.state.vid))===null,'reduced motion uses the still (no video)',fails);
-   await p2.evaluate(()=>{window.__jc.reducedMotion(false);window.__jc.video(true);window.__jc.clearCuts();window.__jc.win();});
+   await p2.evaluate(()=>{window.__jc.reducedMotion(false);window.__jc.video(true);window.__jc.clearCuts();window.__jc.resetReveals();window.__jc.skipToWave(1);window.__jc.untilCut('enemy',40);});
+   {let st;for(let k=0;k<80;k++){st=await p2.evaluate(()=>window.__jc.state);if(st.vid!=='wait')break;await L.frames(p2,1);}
+    L.check(st.cut==='enemy'&&(st.vid==='still'||st.vid===null),'blocked enemy clip falls back to the still card ('+st.vid+')',fails);await L.skipCut(p2);}
+   await p2.evaluate(()=>{window.__jc.clearCuts();window.__jc.win();});
    {let st;for(let k=0;k<80;k++){st=await p2.evaluate(()=>window.__jc.state);if(st.resVid!=='wait'&&st.resVid!==null)break;await L.frames(p2,1);}
     L.check(st.resVid==='still','blocked result clip falls back to the still ('+st.resVid+')',fails);for(let k=0;k<6;k++)await L.frames(p2,2);await L.shot(p2,'run_video_result_blocked');}
    L.check(e2.length===0,'no errors with video blocked '+e2.join(' | '),fails);await c2.close();}
