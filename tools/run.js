@@ -8,7 +8,7 @@ const L=require('./lib');
   await p.evaluate(()=>{window.__jc.instant(true);window.__jc.video(false);});
   // video cut-ins (forced on: headless counts as a low-end device, which uses the stills)
   console.log('== video cut-ins');
-  await p.evaluate(()=>{window.__jc.video(true,4);window.__jc.startMap(0);window.__jc.preloadVideos();});
+  await p.evaluate(()=>{window.__jc.video(true,10);window.__jc.startMap(0);window.__jc.preloadVideos();});
   await p.waitForFunction(()=>Object.values(window.__jc.state.vidState).every(v=>v!=='loading'),null,{timeout:90000});
   const vs=await p.evaluate(()=>window.__jc.state.vidState);L.check(Object.values(vs).every(v=>v==='ready'),'all 5 clips load '+JSON.stringify(vs),fails);
   const vidPlay=async(label,shot)=>{
@@ -32,7 +32,13 @@ const L=require('./lib');
   L.check((await p.evaluate(()=>window.__jc.state.vidKey))==='ronin','ronin cut-in uses its clip',fails);await vidPlay('ronin','run_video_ronin');
   await p.evaluate(()=>{window.__jc.clearCuts();window.__jc.skipToWave(20);let k=null;for(let i=0;i<10&&k!=='shogun';i++){k=window.__jc.untilBoss(40);if(k&&k!=='shogun')window.__jc.clearCuts();}});
   L.check((await p.evaluate(()=>window.__jc.state.vidKey))==='shogun','shogun cut-in uses its clip',fails);await vidPlay('shogun','run_video_shogun');
-  await p.evaluate(()=>{window.__jc.clearCuts();window.__jc.video(false);window.__jc.resetReveals();});
+  // result screens: victory / defeat clips, then hold
+  for(const [mode,shot] of [['win','run_video_victory'],['lose','run_video_defeat']]){
+    await p.evaluate(m=>{window.__jc.clearCuts();window.__jc.startMap(0);m==='win'?window.__jc.win():window.__jc.lose();},mode);
+    let st;for(let k=0;k<200;k++){st=await p.evaluate(()=>window.__jc.state);if(st.resVid==='still'||(st.resVid==='video'&&st.resVidT>2.5))break;await L.frames(p,1);}
+    L.check(st.resVid==='video',mode+' result plays its clip ('+st.resVid+')',fails);await L.shot(p,shot);
+  }
+  await p.evaluate(()=>{window.__jc.clearCuts();window.__jc.video(false);window.__jc.resetReveals();window.__jc.startMap(0);});
   // blocked video -> still art
   {const c2=await b.newContext({viewport:{width:1280,height:720}});const p2=await c2.newPage();const e2=[];L.watch(p2,e2);await p2.route(/assets\/video\//,r=>r.abort());
    await p2.goto(url,{waitUntil:'commit'});await L.ready(p2);
@@ -43,6 +49,9 @@ const L=require('./lib');
    L.check(!(await p2.evaluate(()=>window.__jc.state.cutin)),'still fallback skippable',fails);
    await p2.evaluate(()=>{window.__jc.video();window.__jc.reducedMotion(true);window.__jc.clearCuts();const t=window.__jc.freeTiles(1)[0];window.__jc.ult('tsunami',t.tx,t.ty);});
    L.check((await p2.evaluate(()=>window.__jc.state.vid))===null,'reduced motion uses the still (no video)',fails);
+   await p2.evaluate(()=>{window.__jc.reducedMotion(false);window.__jc.video(true);window.__jc.clearCuts();window.__jc.win();});
+   {let st;for(let k=0;k<80;k++){st=await p2.evaluate(()=>window.__jc.state);if(st.resVid!=='wait'&&st.resVid!==null)break;await L.frames(p2,1);}
+    L.check(st.resVid==='still','blocked result clip falls back to the still ('+st.resVid+')',fails);for(let k=0;k<6;k++)await L.frames(p2,2);await L.shot(p2,'run_video_result_blocked');}
    L.check(e2.length===0,'no errors with video blocked '+e2.join(' | '),fails);await c2.close();}
   // new-enemy reveal fires once per type (fresh save), and pauses the sim
   console.log('== reveals + ultimates');

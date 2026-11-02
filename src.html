@@ -724,7 +724,7 @@ function startMap(mi){
   G={mi,map:m,P,grid,towers:[],enemies:[],projs:[],pools:[],fx:[],texts:[],bolts:[],specials:[],
     gold:220,hp:100,maxHp:100,wave:0,spawners:[],waveLeft:{},cleared:{},ult:{charge:0,idx:0},time:0,speed:1,
     sel:{tx:Math.floor(GW/2),ty:Math.floor(GH/2)},menu:null,fuseFrom:null,drag:null,targeting:false,cursor:{x:W/2,y:H/2},result:null,resultT:0,banner:null,hover:null,dealt:0};
-  screen='play';paused=false;clearCuts();cutin=null;vidPreloadMatch();focusId=null;MUS.mode='play';pauseView='main';
+  screen='play';paused=false;clearCuts();cutin=null;resVidStop();vidPreloadMatch();focusId=null;MUS.mode='play';pauseView='main';
   CAM.taz=0;CAM.az=0.6;CAM.tpol=0.9;CAM.pol=0.7;CAM.tr=24;CAM.r=40;CAM.ttx=0;CAM.ttz=0.6;
   rngS=7+mi*13;
 }
@@ -738,7 +738,7 @@ function callWave(){
   if(!canCallWave()){sfx('deny');return false;}
   const b=earlyBonus();if(b){G.gold+=b;addTextS(VW-170,140,'+'+b+' early',18,C.gold);}
   G.wave++;const list=makeWave(G.wave);G.waveLeft[G.wave]=list.length;G.spawners.push({wave:G.wave,list,i:0,t:0});
-  vidPreloadBoss(G.wave);vidPreloadBoss(G.wave+1);
+  vidPreloadBoss(G.wave);vidPreloadBoss(G.wave+1);if(G.wave>=18)vidLoad('victory');
   sfx('gong');banner(G.wave===20?'FINAL WAVE':'WAVE '+G.wave,G.wave%5===0?'A boss is coming':'');
   MUS.mode=G.wave%5===0?'boss':'play';
   return true;
@@ -850,6 +850,7 @@ function update(dt){
     const p=posAt(P,e.d);e.dx=p.dx;e.dy=p.dy;e.x=p.x;e.y=p.y;
     if(e.d>=P.L){e.dead=true;G.waveLeft[e.wave]--;G.hp-=e.dmg;shake=Math.max(shake,e.boss?0.5:0.18);sfx('leak');addText(e.x,e.y,'-'+e.dmg,22,C.red,'small',1.6);fxRing(e.x,e.y,0.05,0.2,1.6,0xEF5459);}
   }
+  if(G.hp<=40)vidLoad('defeat');
   for(const t of G.towers)updateTower(t,dt);
   updateProjs(dt);
   for(const p of G.pools){p.t+=dt;for(const e of G.enemies){if(e.dead)continue;if(Math.hypot(e.x-p.x,e.y-p.y)<p.r){damage(e,p.dps*dt,p.els,true,p.src);if(p.slow)slowE(e,p.slow,0.3);}}}
@@ -965,7 +966,7 @@ function updateP3(dt){
 
 /* ---------------- 3D sync for game objects ---------------- */
 const LIVE={enemies:new Map(),towers:new Map(),projs:new Map(),pools:new Map(),specials:new Map()};
-function clearMeshes(){for(const k in LIVE){for(const [,m] of LIVE[k])m.parent&&m.parent.remove(m);LIVE[k].clear();}for(const p of P3)p.m.parent&&p.m.parent.remove(p.m);P3.length=0;}
+function clearMeshes(){resVidStop();for(const k in LIVE){for(const [,m] of LIVE[k])m.parent&&m.parent.remove(m);LIVE[k].clear();}for(const p of P3)p.m.parent&&p.m.parent.remove(p.m);P3.length=0;}
 function syncKind(kind,list,make,upd){
   const L=LIVE[kind],seen=new Set();
   for(const o of list){seen.add(o);let m=L.get(o);if(!m){m=make(o);if(!m)continue;MAP3.scene.add(m);L.set(o,m);}upd(o,m);}
@@ -1610,7 +1611,7 @@ function drawWavePreview(rightX,topY){
    Ultimates and the two bosses play a clip inside the cut-in. Loaded lazily once a match starts (ultimates) or just before
    a boss wave. If a clip can't start within 0.4 s (error, autoplay blocked, slow network) the still-art cut-in runs instead.
    Reduced motion, QLOW (phones, low-end) and data-saver always use the stills. */
-const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
+const VID={},VID_INFO={meteor:{sfx:'ドーン!'},tsunami:{sfx:'ザザーン!'},tornado:{sfx:'ゴォォ!'},victory:{},defeat:{},shogun:{sfx:'ズドドド!'},ronin:{sfx:'チャキッ!'}};
 let vidForce=null,vidWaitK=1; // vidWaitK: tests on slow software GL stretch the start-up window // tests: true = allow on any device, false = block
 function vidAllowed(){if(vidForce!==null)return vidForce;const c=navigator.connection;return !RM&&!QLOW&&!(c&&c.saveData);}
 function vidLoad(k){
@@ -1685,6 +1686,27 @@ function drawVidCut(c,o){
   if(pa>0){ctx.save();ctx.globalAlpha*=pa;ctx.translate(W-250,128);ctx.rotate(-0.1);ctx.scale(sc,sc);txt(o.sfx,4,6,62,{disp:true,align:'center',col:C.ink,stroke:C.ink,lw:14});txt(o.sfx,0,0,62,{disp:true,align:'center',col:C.gold,stroke:C.ink,lw:10});ctx.restore();}
   ctx.restore();
   drawSkipHint((1-outA)*Math.min(1,V.a*4));
+}
+
+/* result-screen clips (victory / defeat, 7.9 s): play once when the result backdrop appears, then hold a calm frame
+   just before the clip's fade-out. Same rules as the cut-ins: lazy, stills on reduced motion / QLOW / data-saver / failure. */
+let RV=null;
+function resVidStart(k){
+  RV=null;if(!vidAllowed())return;const v=vidLoad(k);if(!v||v.state==='fail')return;const el=v.el;
+  RV={v,k,mode:'wait',w:0,held:false};
+  try{el.currentTime=0;}catch(e){}el.loop=false;el.volume=0.56;el.muted=!save.sound;
+  const r=RV,fail=()=>{if(r.mode==='wait')r.w=99;};
+  const p=el.play();if(p&&p.catch)p.catch(()=>{if(!el.muted){el.muted=true;const q=el.play();if(q&&q.catch)q.catch(fail);}else fail();});
+}
+function resVidStop(){if(RV){try{RV.v.el.pause();}catch(e){}RV=null;}}
+function resVidTick(dt){
+  if(!RV)return;if(!G||!G.result){resVidStop();return;}
+  const el=RV.v.el;
+  if(RV.v.state==='fail'||el.error){try{el.pause();}catch(e){}RV.mode='still';return;}
+  if(RV.mode==='wait'){RV.w+=dt;if(!el.paused&&el.readyState>=2&&el.currentTime>0.01)RV.mode='video';else if(RV.w>0.4*vidWaitK){try{el.pause();}catch(e){}RV.mode='still';}return;}
+  if(RV.mode==='video'){const hold=(el.duration||7.9)-0.6;
+    if(!RV.held&&(el.currentTime>=hold||el.ended)){el.pause();try{el.currentTime=hold;}catch(e){}RV.held=true;}
+    if(paused&&!el.paused)el.pause();else if(!paused&&!RV.held&&el.paused){const q=el.play();if(q&&q.catch)q.catch(()=>{});}}
 }
 
 /* ---------------- cut-ins (board space 1280x720) ----------------
@@ -2213,8 +2235,12 @@ function drawResult(){
   const a=Math.min(1,G.resultT/0.6);ctx.fillStyle=alpha(C.ink,0.55*a);ctx.fillRect(0,0,VW,VH);
   if(G.resultT<0.9)return;
   const win=G.result==='win',k=win?'victory':'defeat',cmp=CMP();
-  const u=RM?1:ease(Math.min(1,(G.resultT-0.9)/0.5));
-  if(artOk(k)){ctx.save();ctx.globalAlpha=u*artA(k);cover(k,0,0,VW,VH,{zoom:RM?1:1.08-0.06*u,fx:0.5,fy:win?0.62:0.55});
+  let u=RM?1:ease(Math.min(1,(G.resultT-0.9)/0.5));
+  if(RV&&RV.k===k&&RV.mode==='video')u=Math.max(u,ease(Math.min(1,RV.v.el.currentTime/0.5))); // follow the clip on slow frames
+  const rv=RV&&RV.k===k&&RV.mode==='video'&&RV.v.el.readyState>=2?RV.v.el:null;
+  if(rv){ctx.save();ctx.globalAlpha=u;const iw=rv.videoWidth||854,ih=rv.videoHeight||480,s=Math.max(VW/iw,VH/ih);try{ctx.drawImage(rv,(VW-iw*s)/2,(VH-ih*s)/2,iw*s,ih*s);}catch(e){}
+    const g=ctx.createLinearGradient(0,0,0,VH);g.addColorStop(0,'rgba(42,31,46,0.35)');g.addColorStop(0.3,'rgba(42,31,46,0.05)');g.addColorStop(0.55,'rgba(42,31,46,0.12)');g.addColorStop(1,'rgba(42,31,46,0.78)');ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);ctx.restore();}
+  else if(artOk(k)){ctx.save();ctx.globalAlpha=u*artA(k);cover(k,0,0,VW,VH,{zoom:RM?1:1.08-0.06*u,fx:0.5,fy:win?0.62:0.55});
     const g=ctx.createLinearGradient(0,0,0,VH);g.addColorStop(0,win?'rgba(59,42,37,0.15)':'rgba(30,20,45,0.25)');g.addColorStop(0.55,'rgba(42,31,46,0.15)');g.addColorStop(1,'rgba(42,31,46,0.7)');ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);ctx.restore();}
   else speedBurst(0.5,VW/2,VH/2,win?C.gold:C.paper);
   ctx.save();ctx.globalAlpha=u;ctx.translate(0,(1-u)*30);
@@ -2289,7 +2315,7 @@ function updateFx(dt){
   if(!G)return;
   for(const t of G.texts)t.life+=dt;G.texts=G.texts.filter(t=>t.life<t.max);
   if(G.banner){G.banner.t+=dt;if(G.banner.t>G.banner.dur)G.banner=null;}
-  if(G.result)G.resultT+=dt;
+  if(G.result){const was=G.resultT;G.resultT+=dt;if(was<0.75&&G.resultT>=0.75)resVidStart(G.result==='win'?'victory':'defeat');resVidTick(dt);}
 }
 function render(dt){
   if(!R)return;
@@ -2329,7 +2355,7 @@ window.TD={
 };
 /* debug handle for tests and console poking */
 window.__jc={
-  get state(){const vc=bossCut&&bossCut.vid?bossCut:cutin&&cutin.vid?cutin:null;return{vid:vc?vc.vid.mode:null,vidKey:vc?vc.vid.k:null,vidT:vc&&vc.vid.v?vc.vid.v.el.currentTime:0,vidDur:vc?vc.dur:0,preview:lastPreview.slice(),vidState:Object.fromEntries(Object.keys(VID).map(k=>[k,VID[k].state])),screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
+  get state(){const vc=bossCut&&bossCut.vid?bossCut:cutin&&cutin.vid?cutin:null;return{vid:vc?vc.vid.mode:null,vidKey:vc?vc.vid.k:null,vidT:vc&&vc.vid.v?vc.vid.v.el.currentTime:0,vidDur:vc?vc.dur:0,preview:lastPreview.slice(),resVid:RV?RV.mode:null,resVidT:RV?RV.v.el.currentTime:0,vidState:Object.fromEntries(Object.keys(VID).map(k=>[k,VID[k].state])),screen,paused,pauseView,result:G?G.result:null,wave:G?G.wave:0,gold:G?G.gold:0,hp:G?G.hp:0,towers:G?G.towers.map(t=>({type:t.type,tx:t.tx,ty:t.ty,up:t.up})):[],menu:G?G.menu:null,fuseFrom:!!(G&&G.fuseFrom),bossCut:bossCut&&bossCut.kind==='boss'?bossCut.type:null,cut:bossCut?bossCut.kind:null,cutType:bossCut?bossCut.type:null,cutin:cutin?cutin.u.id:null,reveals:revealLog.slice(),seenEnemies:save.seenEnemies.slice(),grid:G&&gridMode()?'on':'off',gridOp:MAP3?MAP3.gridOp:0,painted:!!(MAP3&&MAP3.painted),codexTab,curtain:!!curtain,US,VW,VH,K,CSSU,QLOW,RM,codex:save.codex.slice(),art:Object.fromEntries(Object.keys(ART).map(k=>[k,ART[k].ok?'ok':ART[k].fail?'fail':'pending']))};},
   get G(){return G;},
   ui(){return UI.map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,disabled:!!b.disabled}));},
   // UI-space point -> client (CSS) coords, for synthetic input

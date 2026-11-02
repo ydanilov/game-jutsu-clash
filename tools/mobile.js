@@ -65,7 +65,10 @@ const VPS=[{n:'phone_portrait',w:390,h:844,dpr:3},{n:'phone_landscape',w:844,h:3
       let st;for(let k=0;k<60;k++){st=await p.evaluate(()=>window.__jc.state);if(st.vid!=='wait'&&(st.vid!=='video'||st.vidT>1))break;await L.frames(p,1);}
       L.check(st.vid==='video','forced video cut-in plays on a phone ('+st.vid+')',fails);await L.shot(p,'mobile_'+v.n+'_video');
       await L.skipCut(p,true);L.check(!(await p.evaluate(()=>window.__jc.state.cutin)),'tap skips the video',fails);
-      await p.evaluate(()=>{window.__jc.video();window.__jc.G.specials=[];});
+      await p.evaluate(()=>{window.__jc.video(true,4);window.__jc.win();});
+      {let st;for(let k=0;k<200;k++){st=await p.evaluate(()=>window.__jc.state);if(st.resVid==='still'||(st.resVid==='video'&&st.resVidT>2.5))break;await L.frames(p,1);}
+       L.check(st.resVid==='video','victory clip plays on a phone when forced ('+st.resVid+')',fails);await L.shot(p,'mobile_'+v.n+'_victory_video');}
+      await p.evaluate(()=>{window.__jc.video();window.__jc.startMap(0);});
     }
     await L.clickId(p,'pause',{touch:true,wait:400});await L.shot(p,'mobile_'+v.n+'_pause');
     L.check(errs.length===0,'no errors '+errs.join(' | '),fails);
