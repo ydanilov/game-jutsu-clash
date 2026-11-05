@@ -11,7 +11,8 @@ Chibi stick-man ninjas guard a floating shrine island. Build Fire, Water, Earth 
 
 ## Features
 
-- 3 islands × 20 waves: Flower Meadow (easy), Sakura Hills (medium), Snow Village (hard). An island unlocks once you reach wave 10 on the one before it.
+- 4 islands × 20 waves: Flower Meadow (easy), Sakura Hills (medium), Snow Village (hard), Maple Temple (expert: two portals whose lanes merge, tight switchbacks, spirit stones that boost the tower built on them). An island unlocks once you reach wave 10 on the one before it.
+- The camera opens on a view that fits the whole route, both portals and the shrine; H / R3 returns to it, and edge markers point at a portal or the shrine when they're off screen.
 - 4 base elements, 10 fusions found by experimenting, a Fusion Codex that records your discoveries.
 - 3 ultimates on a 40-second timer: Meteor (from the start), Tsunami (clear Flower Meadow), Tornado (clear Sakura Hills).
 - Painted islands: hand-painted ground and soft, winding roads; the build grid only appears while you choose a spot.
