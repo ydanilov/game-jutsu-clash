@@ -100,7 +100,7 @@ updRM();try{RMQ.addEventListener('change',updRM);}catch(e){}
 /* ---------------- art (WebP, relative paths; every use has a drawn fallback) ----------------
    16:9 screens (1024x572), tower cards t_* (512², cream ground), enemy cards e_* and ultimate cut-ins u_* (16:9, empty left),
    painted ground g_* (1376x768) and road strips road_* (512², road runs top to bottom). */
-const ART_SRC={title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',
+const ART_SRC={title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',autumn:'assets/jc_autumn.webp',
   g_meadow:'assets/jc_g_meadow.webp',g_sakura:'assets/jc_g_sakura.webp',g_snow:'assets/jc_g_snow.webp',road_dirt:'assets/jc_road_dirt.webp',road_snow:'assets/jc_road_snow.webp',
   u_meteor:'assets/jc_u_meteor.webp',u_tsunami:'assets/jc_u_tsunami.webp',u_tornado:'assets/jc_u_tornado.webp'};
 for(const t of ['fire','water','earth','air','inferno','whirl','mountain','tempest','steam','magma','lightning','wood','ice','sand','phoenix','tsunami','colossus','hurricane','onsen','volcano','firestorm','mist','swamp','rain','forge','crystal','skystone','sun','blizzard','dustdevil','dragon','rainbow','meteor','bamboo'])ART_SRC['t_'+t]='assets/jc_t_'+t+'.webp';
