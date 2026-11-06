@@ -93,7 +93,7 @@ updRM();try{RMQ.addEventListener('change',updRM);}catch(e){}
 /* ---------------- art (WebP, relative paths; every use has a drawn fallback) ----------------
    16:9 screens (1024x572), tower cards t_* (512², cream ground), enemy cards e_* and ultimate cut-ins u_* (16:9, empty left),
    painted ground g_* (1376x768) and road strips road_* (512², road runs top to bottom). */
-const ART_SRC={title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',autumn:'assets/jc_autumn.webp',menu:'assets/jc_menu.webp',
+const ART_SRC={title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',autumn:'assets/jc_autumn.webp',menu:'assets/jc_menu.webp',bg_meadow:'assets/jc_bg_meadow.webp',bg_sakura:'assets/jc_bg_sakura.webp',bg_snow:'assets/jc_bg_snow.webp',bg_autumn:'assets/jc_bg_autumn.webp',
   g_meadow:'assets/jc_g_meadow.webp',g_sakura:'assets/jc_g_sakura.webp',g_snow:'assets/jc_g_snow.webp',road_dirt:'assets/jc_road_dirt.webp',road_snow:'assets/jc_road_snow.webp',
   u_meteor:'assets/jc_u_meteor.webp',u_tsunami:'assets/jc_u_tsunami.webp',u_tornado:'assets/jc_u_tornado.webp'};
 for(const t of ['fire','water','earth','air','inferno','whirl','mountain','tempest','steam','magma','lightning','wood','ice','sand','phoenix','tsunami','colossus','hurricane','onsen','volcano','firestorm','mist','swamp','rain','forge','crystal','skystone','sun','blizzard','dustdevil','dragon','rainbow','meteor','bamboo'])ART_SRC['t_'+t]='assets/jc_t_'+t+'.webp';
@@ -981,11 +981,17 @@ function buildDiorama(mi){
   const tgtRing=mesh(new THREE.RingGeometry(0.93,1,40),new THREE.MeshBasicMaterial({color:0xEF5459,transparent:true,opacity:0.9,depthWrite:false,side:THREE.DoubleSide}),false);tgtRing.rotation.x=-Math.PI/2;tgtRing.position.y=0.04;tgtRing.visible=false;scene.add(tgtRing);
   const terr=TERR;
   MAP3={roadArr:[...road].map(k=>k.split(',').map(Number)),scene,gridLines,hl,hlEdge,rangeRing,rangeDisc,tgtRing,orb,blocked,boardDecor,road,ground,colArt:null,oldPebbles:new THREE.Group(),theme:m.theme,path:m.path,path2:m.path2||null,stones:stoneMeshes,gridOp:0,painted:true,pick,terr,tiles:T};
+  mapBackdrop();
   return MAP3;
 }
 
 /* ---------------- build a map scene ---------------- */
 let MAP3=null;
+/* painted sky per island (Google Flow "JC level backdrop <map>"); the gradient SKY stays until it loads or if it fails */
+const BG_FOG={meadow:0xF6E3BC,sakura:0xF7C9A0,snow:0xE2DCEC,autumn:0xF2B88A};
+function mapBackdrop(){if(!MAP3)return;const th=MAP3.theme,k='bg_'+th,sc=MAP3.scene;if(sc.fog&&BG_FOG[th])sc.fog.color.setHex(BG_FOG[th]);if(!artOk(k))return;
+  const t=artTex(k,1376,768,THREE.ClampToEdgeWrapping);t.repeat.set(0.92,0.92);t.offset.set(0.04,0.04);sc.background=t;MAP3.bg=t;}
+ART_HOOKS.push(k=>{if(MAP3&&k==='bg_'+MAP3.theme)mapBackdrop();});
 function buildMapScene(mi){
   if(MAPS[mi].area)return buildDiorama(mi);TERR=null;
   const m=MAPS[mi],th=THEMES[m.theme],scene=new THREE.Scene();anim3.length=0;
@@ -1119,6 +1125,7 @@ function buildMapScene(mi){
   const rangeDisc=mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({color:0xFFE08A,transparent:true,opacity:0.14,depthWrite:false}),false);rangeDisc.rotation.x=-Math.PI/2;rangeDisc.position.y=0.022;rangeDisc.visible=false;scene.add(rangeDisc);
   const tgtRing=mesh(new THREE.RingGeometry(0.93,1,40),new THREE.MeshBasicMaterial({color:0xEF5459,transparent:true,opacity:0.9,depthWrite:false,side:THREE.DoubleSide}),false);tgtRing.rotation.x=-Math.PI/2;tgtRing.position.y=0.04;tgtRing.visible=false;scene.add(tgtRing);
   MAP3={roadArr:[...road].map(k=>k.split(',').map(Number)),scene,gridLines,hl,hlEdge,rangeRing,rangeDisc,tgtRing,orb,blocked,boardDecor,road,ground,colArt,oldPebbles,theme:m.theme,path:m.path,path2:m.path2||null,stones:stoneMeshes,gridOp:0,painted:false};
+  mapBackdrop();
   paintMap(MAP3);
   return MAP3;
 }
@@ -3504,6 +3511,7 @@ function render(dt){
   if(!R)return;
   if(screen==='play'&&G&&MAP3){updateCamera(dt);sync3D(dt);
     const sh=RM?Math.min(shake,0.05):shake;if(sh>0){camera.position.x+=(Math.random()-0.5)*sh;camera.position.y+=(Math.random()-0.5)*sh;}
+    if(MAP3.bg){MAP3.bg.offset.x=0.04+Math.sin(CAM.az)*0.035;MAP3.bg.offset.y=Math.max(0,Math.min(0.08,0.04+(CAM.pol-0.86)*0.08));}
     R.render(MAP3.scene,camera);}
   else{updateLobby3D(dt);R.render(LS,lcam);}
 }
