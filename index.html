@@ -1131,7 +1131,10 @@ function buildMapScene(mi){
 }
 
 /* ---------------- game state ---------------- */
-let screen='intro',G=null,paused=false,cutin=null,bossCut=null,ghost=false;
+/* the store (Diego's Games) opens the game with ?from=store: its page already is the cover, so we land straight on the lobby */
+const STORE_URL='https://diego-games.vercel.app/',FRAMED=(()=>{try{return window.parent!==window;}catch(e){return true;}})(),FROM_STORE=/[?&]from=store\b/.test(location.search);
+function toStore(){sfx('gong');if(FRAMED&&FROM_STORE){try{window.parent.postMessage({type:'diego-games:exit'},'*');return;}catch(e){}}location.href=STORE_URL;}
+let screen=FROM_STORE?'title':'intro',G=null,paused=false,cutin=null,bossCut=null,ghost=false;
 const MINF=13;
 let shake=0,flash=0,animT=0,speedLines=0;
 let focusId=null,UI=[];
@@ -3106,18 +3109,24 @@ function drawTitle(){
   // title key art lingers as a soft sky wash at the top-left so the two screens feel like one place
   if(LB.introAt){const f=RM?0:1-Math.min(1,(performance.now()-LB.introAt)/1100);if(f>0&&artOk('title')){ctx.save();ctx.globalAlpha=f*f;cover('title',0,0,VW,VH,{zoom:1.04+(1-f)*0.1,fx:0.5,fy:0.6});ctx.restore();}else if(f<=0)LB.introAt=0;}
   const lx=cmp?28:70;
+  // soft paper wash behind the menu column so the logo and buttons never fight the island
+  {const g=ctx.createLinearGradient(0,0,VW*(cmp?0.62:0.52),0);g.addColorStop(0,alpha(C.paper,0.62));g.addColorStop(0.55,alpha(C.paper,0.3));g.addColorStop(1,alpha(C.paper,0));ctx.fillStyle=g;ctx.fillRect(0,0,VW*(cmp?0.62:0.52),VH);}
+  // the way back to the store, always in the same corner
+  if(cmp)button('store',VW-146,10,124,32,'← ALL GAMES',toStore,{sz:12,r:16});
+  else button('store',lx,24,158,36,'← ALL GAMES',toStore,{sz:13,r:18});
   if(cmp){logo(lx,46,52);}
-  else logo(lx,128-0,104);
-  ctx.save();ctx.font=font(cmp?13:15,false);const tag='術合戦 · a cozy elemental tower defense',sw=ctx.measureText(tag).width+30;const tgy=cmp?128:282;panel(lx,tgy,sw,cmp?28:34,{r:cmp?14:17,fill:C.paper,lw:2.5});txt(tag,lx+15,tgy+(cmp?15:18),cmp?13:15,{});ctx.restore();
+  else logo(lx,128,84);
+  ctx.save();ctx.font=font(cmp?13:15,false);const tag='術合戦 · a cozy elemental tower defense',sw=ctx.measureText(tag).width+30;const tgy=cmp?128:252;panel(lx,tgy,sw,cmp?28:34,{r:cmp?14:17,fill:C.paper,lw:2.5});txt(tag,lx+15,tgy+(cmp?15:18),cmp?13:15,{});ctx.restore();
   credit(lx+sw+12,tgy+(cmp?15:18),{sz:cmp?12:14});
+  if(!cmp){txt('Chibi ninjas march out of the portal.',lx+4,tgy+58,15,{col:C.ink,stroke:C.paper,lw:4.5,w:800});txt('Build towers, mix elements, keep your island safe.',lx+4,tgy+80,15,{col:C.ink,stroke:C.paper,lw:4.5,w:800});}
   // seal
   if(!cmp){const sealS=ctl('seal',VW-100,22,66,150,{act:()=>sfx('gong'),tip:{title:'術合戦 · jutsu gassen',lines:['“A clash of techniques.” The game’s name, stamped like a seal on a scroll.'],accent:C.red,w:280},tipBelow:true});const sealOn=sealS.on;
     ctx.save();ctx.translate(VW-67,97);if(!RM)ctx.rotate(sealOn?-0.03:0.05);ctx.scale(sealOn?1.08:1,sealOn?1.08:1);ctx.fillStyle=alpha(C.ink,0.3);rrect(-31,-71,62,148,14);ctx.fill();ctx.fillStyle=C.red;rrect(-31,-75,62,148,14);ctx.fill();ctx.strokeStyle=C.paper;ctx.lineWidth=3;rrect(-25,-69,50,136,10);ctx.stroke();
     ['術','合','戦'].forEach((k,i)=>txt(k,0,-44+i*44,30,{disp:true,align:'center',col:C.paper}));ctx.restore();if(sealS.foc)focusRing(VW-100,22,66,150,14);}
   // buttons
-  const by=cmp?170:360,bw=cmp?250:300,gp=cmp?8:12,h1=cmp?50:62,h2=cmp?44:54;
+  const by=cmp?170:362,bw=cmp?250:330,gp=cmp?8:12,h1=cmp?50:66,h2=cmp?44:54;
   const cleared=save.cleared.filter(Boolean).length;
-  lobbyButton('play',lx,by,bw,h1,'PLAY','戦','3 island maps · 20 waves each',()=>go(()=>{screen='maps';focusId=null;},{soft:true}),{sz:cmp?22:26,fill:C.red,col:C.paper,kbg:C.ink,badge:cleared?cleared+'/3':null});
+  lobbyButton('play',lx,by,bw,h1,'PLAY','戦',MAPS.length+' island maps · 20 waves each',()=>go(()=>{screen='maps';focusId=null;},{soft:true}),{sz:cmp?22:26,fill:C.red,col:C.paper,kbg:C.ink,badge:cleared?cleared+'/'+MAPS.length:null});
   lobbyButton('codex',lx,by+h1+gp,bw,h2,'FUSION CODEX','典',fusCount()+' of 10 fusions · '+triCount()+' of 20 level 3',()=>go(()=>{screen='codex';focusId=null;},{soft:true}),{sz:cmp?15:17,badge:cmp?null:(fusCount()+triCount())+'/30'});
   lobbyButton('how',lx,by+h1+h2+gp*2,bw,h2,'HOW TO PLAY','学','Controls, elements, bosses',()=>go(()=>{screen='help';focusId=null;},{soft:true}),{sz:cmp?15:17});
   lobbyButton('settings',lx,by+h1+h2*2+gp*3,bw,h2,'SETTINGS','設','Sound, motion, UI size, graphics',()=>go(()=>{screen='settings';focusId=null;},{soft:true}),{sz:cmp?15:17});
