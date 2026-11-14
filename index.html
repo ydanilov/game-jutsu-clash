@@ -100,7 +100,7 @@ updRM();try{RMQ.addEventListener('change',updRM);}catch(e){}
 /* ---------------- art (WebP, relative paths; every use has a drawn fallback) ----------------
    16:9 screens (1024x572), tower cards t_* (512², cream ground), enemy cards e_* and ultimate cut-ins u_* (16:9, empty left),
    painted ground g_* (1376x768) and road strips road_* (512², road runs top to bottom). */
-const ART_SRC={title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',autumn:'assets/jc_autumn.webp',menu:'assets/jc_menu.webp',bg_meadow:'assets/jc_bg_meadow.webp',bg_sakura:'assets/jc_bg_sakura.webp',bg_snow:'assets/jc_bg_snow.webp',bg_autumn:'assets/jc_bg_autumn.webp',
+const ART_SRC={logo:'assets/jc_logo.webp',title:'assets/jc_title.webp',meadow:'assets/jc_meadow.webp',sakura:'assets/jc_sakura.webp',snow:'assets/jc_snow.webp',shogun:'assets/jc_shogun.webp',victory:'assets/jc_victory.webp',defeat:'assets/jc_defeat.webp',autumn:'assets/jc_autumn.webp',menu:'assets/jc_menu.webp',bg_meadow:'assets/jc_bg_meadow.webp',bg_sakura:'assets/jc_bg_sakura.webp',bg_snow:'assets/jc_bg_snow.webp',bg_autumn:'assets/jc_bg_autumn.webp',
   g_meadow:'assets/jc_g_meadow.webp',g_sakura:'assets/jc_g_sakura.webp',g_snow:'assets/jc_g_snow.webp',road_dirt:'assets/jc_road_dirt.webp',road_snow:'assets/jc_road_snow.webp',
   u_meteor:'assets/jc_u_meteor.webp',u_tsunami:'assets/jc_u_tsunami.webp',u_tornado:'assets/jc_u_tornado.webp'};
 for(const t of ['fire','water','earth','air','inferno','whirl','mountain','tempest','steam','magma','lightning','wood','ice','sand','phoenix','tsunami','colossus','hurricane','onsen','volcano','firestorm','mist','swamp','rain','forge','crystal','skystone','sun','blizzard','dustdevil','dragon','rainbow','meteor','bamboo'])ART_SRC['t_'+t]='assets/jc_t_'+t+'.webp';
@@ -583,11 +583,12 @@ const THEMES={
 const groundKey=th=>THEMES[th].ground||('g_'+th);
 const anim3=[];
 const SM={flatShading:false};
-function roundTree(cols,s){const g=new THREE.Group();const tr=mesh(geo('trunk',()=>new THREE.CylinderGeometry(0.07,0.11,0.55,5)),mat(0x8A5A3B));tr.position.y=0.27;g.add(tr);
-  const cg=geo('canopy',()=>new THREE.IcosahedronGeometry(0.42,1));const c1=mesh(cg,mat(cols[0],SM));c1.position.y=0.78;g.add(c1);const c2=mesh(cg,mat(cols[1%cols.length],SM));c2.scale.setScalar(0.66);c2.position.set(0.26,0.62,0.1);g.add(c2);const c3=mesh(cg,mat(cols[2%cols.length],SM));c3.scale.setScalar(0.58);c3.position.set(-0.2,1.0,-0.06);g.add(c3);const c4=mesh(cg,mat(cols[1%cols.length],SM));c4.scale.setScalar(0.52);c4.position.set(-0.24,0.6,0.2);g.add(c4);const c5=mesh(cg,mat(cols[0],SM));c5.scale.setScalar(0.48);c5.position.set(0.08,0.66,-0.3);g.add(c5);tr.rotation.z=0.12;
+function roundTree(cols,s){const g=new THREE.Group(),bark=mat(0x7A5238,SM),P=pal3(cols);
+  g.add(treeLimb('tkG',[[0,0,0],[0.04,0.24,0.01],[-0.03,0.5,0],[0.01,0.7,0]],0.13,0.07,bark));g.add(treeLimb('tkG2',[[0,0.4,0],[0.18,0.56,0.08],[0.3,0.64,0.12]],0.05,0.025,bark));
+  clump(g,0,0.98,0,0.46,P);clump(g,0.32,0.76,0.12,0.28,P);clump(g,-0.3,0.82,-0.1,0.3,P);
   g.scale.setScalar(s);g.rotation.y=rnd()*TAU;return g;}
 function pineTree(snowy,s){const g=new THREE.Group();const tr=mesh(geo('ptrunk',()=>new THREE.CylinderGeometry(0.07,0.09,0.35,5)),mat(0x7A4E34));tr.position.y=0.17;g.add(tr);
-  const cg=geo('pcone',()=>new THREE.ConeGeometry(0.5,0.6,6));for(let i=0;i<3;i++){const c=mesh(cg,mat(i%2?0x356B4A:0x3E7A55));c.scale.setScalar(1-i*0.24);c.position.y=0.5+i*0.32;g.add(c);if(snowy){const sc=mesh(geo('scap',()=>new THREE.ConeGeometry(0.3,0.22,6)),mat(0xFFFFFF));sc.scale.setScalar(1-i*0.24);sc.position.y=0.5+i*0.32+0.2*(1-i*0.24);g.add(sc);}}
+  const cg=geo('pcone',()=>new THREE.ConeGeometry(0.5,0.62,11));for(let i=0;i<4;i++){const c=mesh(cg,mat([0x2F6344,0x3A7550,0x44835A,0x52946A][i],SM));c.scale.setScalar(1-i*0.2);c.position.set((i%2?0.03:-0.02),0.46+i*0.27,0);c.rotation.z=(i%2?0.06:-0.05);g.add(c);if(snowy&&i<3){const sc=mesh(geo('scap',()=>new THREE.ConeGeometry(0.3,0.22,11)),mat(0xFFFFFF,SM));sc.scale.setScalar(1-i*0.2);sc.position.y=0.46+i*0.27+0.2*(1-i*0.2);g.add(sc);}}
   g.scale.setScalar(s);g.rotation.y=rnd()*TAU;return g;}
 function rock(s,col){const r=mesh(geo('rock',()=>new THREE.DodecahedronGeometry(0.24,0)),mat(col||0xA7A39C));r.scale.set(s,s*0.7,s*0.9);r.position.y=0.08*s;r.rotation.y=rnd()*TAU;return r;}
 function bush(col,s){const g=new THREE.Group();const b=geo('bush',()=>new THREE.IcosahedronGeometry(0.22,0));for(let i=0;i<3;i++){const m=mesh(b,mat(col));m.position.set((i-1)*0.18,0.15+(i===1?0.06:0),(i%2)*0.08);m.scale.setScalar(i===1?1.1:0.85);g.add(m);}g.scale.setScalar(s);g.rotation.y=rnd()*TAU;return g;}
@@ -705,21 +706,28 @@ const _tp=new THREE.Plane(new THREE.Vector3(0,1,0),-0.45);
 
 /* ---- models (low-poly, from the Flow concept sheets) ---- */
 const SKPINK=[0xF6A9C5,0xFABCD3,0xEE95B4,0xF8B2CB];
+/* trees v3 (Flow sheets "JC map assets"): a tapered, bent trunk with branches and a crown of soft cloud clumps (dark underside, light top) */
+const _lv=new THREE.Vector3();
+function treeLimb(key,pts,r0,r1,m){const g=geo(key,()=>{const c=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2]))),N=8,R=7,t=new THREE.TubeGeometry(c,N,1,R,false),P=t.attributes.position;
+    for(let i=0;i<=N;i++){const ctr=c.getPointAt(i/N),u=i/N,r=(r0+(r1-r0)*u)*(1+0.35*Math.pow(1-u,6));for(let j=0;j<=R;j++){const k=i*(R+1)+j;_lv.fromBufferAttribute(P,k).sub(ctr).multiplyScalar(r).add(ctr);P.setXYZ(k,_lv.x,_lv.y,_lv.z);}}
+    t.computeVertexNormals();return t;});return mesh(g,m);}
+function pal3(cols){const L=h=>((h>>16)&255)*0.3+((h>>8)&255)*0.59+(h&255)*0.11,c=[...cols].sort((x,y)=>L(x)-L(y));return [c[0],c[Math.floor((c.length-1)/2)]===c[0]&&c.length>1?c[1]:c[Math.floor((c.length-1)/2)],c[c.length-1]];}
+function clump(g,x,y,z,r,P){const sp=geo('clS',()=>new THREE.IcosahedronGeometry(1,2)),D=mat(P[0],SM),M=mat(P[1],SM),Lm=mat(P[2],SM);
+  const put=(m,px,py,pz,sx,sy,sh)=>{const b=mesh(sp,m,sh);b.position.set(px,py,pz);b.scale.set(sx,sy,sx);g.add(b);};
+  put(M,x,y,z,r,r*0.76);const n=5,a0=rnd()*TAU;
+  for(let k=0;k<n;k++){const a=a0+k/n*TAU,q=r*(0.5+rnd()*0.12);put(k%2?D:M,x+Math.cos(a)*r*0.62,y-r*(0.2+rnd()*0.12),z+Math.sin(a)*r*0.62,q,q*0.8);}
+  put(Lm,x+r*0.2,y+r*0.36,z+r*0.12,r*0.56,r*0.44,false);put(Lm,x-r*0.32,y+r*0.2,z-r*0.22,r*0.4,r*0.32,false);}
 function skTree(kind,s,cols){
-  const g=new THREE.Group(),bark=mat(0x6E4331),seg=geo('sktrunk',()=>new THREE.CylinderGeometry(0.055,0.085,0.42,5));
-  const bends=kind==='tall'?[[0.12,0.05],[-0.22,-0.05],[0.16,0.08]]:kind==='weep'?[[0.28,0],[-0.32,0.12],[0.2,-0.1]]:[[0.22,0.05],[-0.28,0.1],[0.12,-0.08]];
-  let x=0,y=0,z=0;
-  for(let k=0;k<3;k++){const [bz,bx]=bends[k],m=mesh(seg,bark),sc=1-k*0.16;m.scale.set(sc,1,sc);m.rotation.set(bx,0,bz);
-    const h=0.42;m.position.set(x-Math.sin(bz)*h/2,y+Math.cos(bz)*h/2,z+Math.sin(bx)*h/2);g.add(m);
-    x-=Math.sin(bz)*h;z+=Math.sin(bx)*h;y+=Math.cos(bz)*h*0.92;}
-  // a side branch
-  const br=mesh(geo('skbranch',()=>new THREE.CylinderGeometry(0.025,0.045,0.38,4)),bark);br.position.set(x+0.16,y-0.25,z);br.rotation.z=-0.9;g.add(br);
-  const blob=geo('skblob',()=>new THREE.IcosahedronGeometry(0.3,1)),pal=cols||SKPINK,pc=()=>mat(pal[Math.floor(rnd()*pal.length)],SM);
-  const add=(dx,dy,dz,sx,sy,sz)=>{const b=mesh(blob,pc());b.position.set(x+dx,y+dy,z+dz);b.scale.set(sx,sy||sx,sz||sx);b.rotation.set(rnd()*3,rnd()*3,0);g.add(b);return b;};
-  if(kind==='tall'){for(let k=0;k<6;k++){const a=k*2.1;add(Math.cos(a)*0.17,0.05+k*0.17,Math.sin(a)*0.17,0.85-k*0.07);}}
-  else if(kind==='weep'){for(let k=0;k<5;k++){const a=k/5*TAU;add(Math.cos(a)*0.28,0.15+(k%2)*0.08,Math.sin(a)*0.24,0.9);}add(0,0.32,0,1);
-    for(let k=0;k<7;k++){const a=k/7*TAU+0.3;add(Math.cos(a)*0.5,-0.22-(k%3)*0.06,Math.sin(a)*0.42,0.42,1.25,0.42);}}
-  else{add(0,0.1,0,1.15);for(let k=0;k<5;k++){const a=k/5*TAU+rnd();add(Math.cos(a)*0.34,0.02+rnd()*0.18,Math.sin(a)*0.3,0.75+rnd()*0.2);}add(0.05,0.36,-0.04,0.8);}
+  const g=new THREE.Group(),bark=mat(kind==='tall'?0x7A5A40:0x6B4634,SM),P=pal3(cols||SKPINK);
+  if(kind==='tall'){g.add(treeLimb('tkT',[[0,0,0],[0.04,0.35,0.02],[-0.03,0.75,0],[0.02,1.1,0]],0.1,0.045,bark));g.add(treeLimb('tkT2',[[0,0.5,0],[0.14,0.66,0.06],[0.26,0.74,0.1]],0.04,0.02,bark));
+    clump(g,0,0.92,0,0.36,P);clump(g,0.27,0.8,0.1,0.21,P);clump(g,-0.25,1.0,-0.1,0.22,P);clump(g,0.04,1.3,0,0.29,P);clump(g,0,1.6,0,0.2,P);}
+  else if(kind==='weep'){g.add(treeLimb('tkW',[[0,0,0],[0.12,0.34,0],[-0.06,0.7,0.03],[0.05,1.0,0]],0.115,0.05,bark));g.add(treeLimb('tkW2',[[0,0.62,0],[-0.22,0.86,0.08],[-0.4,0.96,0.12]],0.045,0.02,bark));g.add(treeLimb('tkW3',[[0.02,0.74,0],[0.24,0.94,-0.1],[0.42,1.0,-0.14]],0.045,0.02,bark));
+    clump(g,0.04,1.16,0,0.42,P);clump(g,-0.42,1.04,0.12,0.26,P);clump(g,0.44,1.06,-0.14,0.26,P);
+    const dg=geo('clW',()=>new THREE.SphereGeometry(1,7,8));for(let k=0;k<14;k++){const a=k/14*TAU+0.2,rr=0.36+(k%3)*0.13,d=mesh(dg,mat(P[k%3?1:2],SM),false),len=0.2+(k%4)*0.07;d.scale.set(0.07,len,0.07);d.position.set(0.04+Math.cos(a)*rr,0.98-len*0.7-(k%2)*0.05,Math.sin(a)*rr);g.add(d);
+      const ph=k,z0=d.position.z;anim3.push((dt,t)=>{d.rotation.z=RM?0:Math.sin(t*1.4+ph)*0.1;});}}
+  else{g.add(treeLimb('tkR',[[0,0,0],[0.07,0.3,0.02],[-0.08,0.62,0],[0.02,0.92,0.03]],0.12,0.055,bark));g.add(treeLimb('tkR2',[[-0.03,0.52,0],[-0.24,0.8,0.06],[-0.42,0.98,0.1]],0.05,0.022,bark));g.add(treeLimb('tkR3',[[-0.02,0.7,0],[0.2,0.9,-0.08],[0.4,1.04,-0.12]],0.048,0.022,bark));
+    clump(g,0.02,1.2,0,0.42,P);clump(g,-0.46,1.06,0.1,0.3,P);clump(g,0.44,1.12,-0.12,0.32,P);clump(g,0.04,1.02,0.36,0.25,P);}
+  for(let k=0;k<3;k++){const a=k/3*TAU+0.6,rt=mesh(geo('tkRoot',()=>new THREE.SphereGeometry(1,7,6)),bark,false);rt.scale.set(0.07,0.045,0.13);rt.position.set(Math.cos(a)*0.12,0.03,Math.sin(a)*0.12);rt.rotation.y=-a+Math.PI/2;g.add(rt);}
   g.scale.setScalar(s);g.rotation.y=rnd()*TAU;return g;}
 function skLantern(s){
   const g=new THREE.Group(),st=mat(0xB3ADA3),st2=mat(0x9E988E);
@@ -3193,6 +3201,8 @@ function lobbyButton(id,x,y,w,h,label,kanji,cap,act,o={}){
 }
 function logo(x,y,sz,o={}){
   const ty=RM?0:Math.sin(animT*1.4)*3;const al=o.align||'left';
+  // painted title lettering (Google Flow "LOGO2 Jutsu Clash v4", keyed out); the drawn text below stays as the fallback
+  if(artOk('logo')){const im=ART.logo.im,h=sz*2.05,w=h*im.naturalWidth/im.naturalHeight,lx=al==='center'?x-w/2:x-w*0.04;ctx.save();ctx.globalAlpha*=artA('logo');ctx.shadowColor='rgba(42,31,46,0.45)';ctx.shadowBlur=14*K;ctx.shadowOffsetY=4*K;ctx.drawImage(im,lx,y-sz*0.62+ty,w,h);ctx.restore();return;}
   txt('JUTSU',x,y+ty,sz,{disp:true,col:C.paper,stroke:C.ink,lw:sz*0.19,align:al});txt('JUTSU',x,y+ty,sz,{disp:true,col:C.paper,align:al});
   txt('CLASH',x+sz*0.06,y+sz*1.04+ty,sz,{disp:true,col:C.ink,stroke:C.ink,lw:sz*0.19,align:al});txt('CLASH',x,y+sz*0.98+ty,sz,{disp:true,col:C.red,stroke:C.ink,lw:sz*0.08,align:al});
 }
